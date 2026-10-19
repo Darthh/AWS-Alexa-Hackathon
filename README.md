@@ -15,7 +15,9 @@
 
 Built for the **Alexa+ hackathon track**. Off-Peak combines the household's electricity tariff, appliance deadlines, and room usage into an explainable schedule through a real Model Context Protocol server and a browser-based Alexa+ simulator.
 
-**Status: hackathon prototype with an offline local demo.** The simulator, deterministic planner, MCP tools, browser client, and optional AWS CDK deployment path are implemented. Alexa+ is simulated here; the repository is not connected to an Echo device or the Alexa developer console. Cloud deployment and real-device operation require account-specific setup and live validation. See [current boundaries](#current-boundaries).
+**[Open the live OffPeak demo →](https://offpeak.patrickvaldivia123.workers.dev)**
+
+**Status: hackathon prototype with a public demo and an offline local demo.** The AWS-inspired energy console preserves the simulator, deterministic planner, all 17 MCP tools, voice/screen controls, room occupancy, simulated clock, ledger, and traffic inspector. The public demo runs on Cloudflare Workers with a separate simulated household per visitor. Alexa+ is simulated here; the repository is not connected to an Echo device or the Alexa developer console. The optional AWS CDK deployment and real-device operation still require account-specific setup. See [current boundaries](#current-boundaries).
 
 ## Why Off-Peak exists
 
@@ -39,6 +41,7 @@ The planner and money calculations are deterministic TypeScript. A language mode
 - [MCP tools and resources](#mcp-tools-and-resources)
 - [Configuration](#configuration)
 - [Optional integrations](#optional-integrations)
+- [Free Cloudflare deployment](#free-cloudflare-deployment)
 - [AWS deployment](#aws-deployment)
 - [Tariffs and savings](#tariffs-and-savings)
 - [Development and testing](#development-and-testing)
@@ -51,9 +54,9 @@ The planner and money calculations are deterministic TypeScript. A language mode
 
 ## See it in action
 
-![The real Off-Peak simulator showing a proposed washer, dryer, dishwasher, and EV charging schedule, with $7.74 in synthetic demo savings](docs/screenshots/01-plan.png)
+![OffPeak's AWS-inspired energy console: navigation, household metrics, Alexa+ appliance plan with $7.74 in synthetic savings, room occupancy, simulated clock, and activity ledger](docs/screenshots/01-plan.png)
 
-*Captured from the running local application in mock LLM mode. The timeline is the MCP App, the browser is connected to 17 real MCP tools, and the rate is explicitly labeled as synthetic.*
+*Captured from the live Workers deployment in mock LLM mode. The light console uses AWS-style navigation, panels, and orange primary actions. The embedded timeline is the real MCP App, the browser connects to 17 MCP tools, and electricity rates and savings are explicitly synthetic.*
 
 > “I need the car charged by 7, dishes and laundry done tonight, nothing loud after 10.”
 
@@ -121,7 +124,7 @@ The defaults use demo tariffs, simulated devices and time, JSON persistence, a l
 | `http://localhost:5173/?ui=native` | Renders tool output natively instead of using the MCP App iframe. |
 | `http://localhost:5173/?mode=scripted&ui=native` | Combines both fallbacks for a predictable demonstration. |
 
-The **Brain**, **Screen**, **Echo Show / Voice-only**, and **Voice / Muted** controls are also available in the top bar. Hold the microphone button or spacebar for push-to-talk when the browser supports speech recognition; type or use the example buttons otherwise.
+The **Brain**, **Screen**, **Echo Show / Voice-only**, and **Voice / Muted** controls are available in the **Alexa+ simulator** toolbar. Hold the microphone button or spacebar for push-to-talk when the browser supports speech recognition; type or use the example buttons otherwise. The sidebar jumps to every console panel, including **Ledger & savings** and **MCP Inspector**.
 
 </details>
 
@@ -317,7 +320,7 @@ Copy [`.env.example`](.env.example) to `.env` at the repository root. The server
 | --- | --- | --- |
 | `PORT` | `8787` | Express/MCP server port |
 | `WEB_ORIGIN` | `http://localhost:5173` | Exact allowed browser origin for CORS |
-| `VITE_MCP_URL` | `http://localhost:8787/mcp` | Browser's MCP endpoint; also determines the companion API base URL |
+| `VITE_MCP_URL` | `http://localhost:8787/mcp` locally; same-origin `/mcp` in production | Browser's MCP endpoint; also determines the companion API base URL. The Worker build always uses its own origin. |
 | `HOUSEHOLD_TZ` | `America/Los_Angeles` | Household-local pricing and schedule timezone |
 | `DEMO_ZIP` | Empty | Optional ZIP stored on the seeded household |
 | `TARIFF_SOURCE` | `demo` | `demo`, `fixture`, or `openei` |
@@ -428,6 +431,28 @@ HA_TOKEN=your-home-assistant-token
 Review [`fixtures/ha-map.json`](fixtures/ha-map.json) and replace its example entity IDs with the entities you intend to control. Mapped devices send real REST service calls; unmapped devices remain simulated. This is an actuator gateway, not a full live telemetry/occupancy integration. The household model uses Fahrenheit, so verify entity temperature units before thermostat control.
 
 Keep `DEVICES=sim` for a hardware-free demonstration.
+
+## Free Cloudflare deployment
+
+**Live demo: <https://offpeak.patrickvaldivia123.workers.dev>**
+
+The React console and the complete Express/MCP backend run together on Workers. The `workers.dev` subdomain is free; no domain registration, AWS deployment, API key, or paid-plan upgrade is required. Usage remains subject to [Cloudflare's Workers Free and SQLite Durable Object quotas](https://developers.cloudflare.com/workers/platform/pricing/).
+
+Each browser receives a random, HttpOnly, same-site session cookie and its own SQLite-backed Durable Object. The household, plans, scheduled work, ledger, and simulated time persist across refreshes. Inactive demos expire after 24 hours; a resumed runtime starts its simulated clock paused. Clear cookies or use Reset for a new scenario. This is a disposable demo, not an authenticated smart-home account.
+
+The public deployment uses simulated devices, bundled tariffs, the mock LLM, and optional browser speech. It has no AWS credentials, paid model calls, Home Assistant connection, or real device controls. All 17 tools and the existing UI controls remain available. Requests stay on the same origin, and browser requests from other origins are rejected.
+
+```bash
+npm ci
+npx wrangler login
+npm run deploy
+```
+
+`wrangler.jsonc` enables the free subdomain, static assets, Node compatibility, and a **SQLite** Durable Object migration. The deploy command builds every required artifact; the web build ignores a local `VITE_MCP_URL` override so it cannot accidentally publish a localhost endpoint. Deploying to another Cloudflare account also requires updating the trusted hostname and web origin in `worker/index.ts`.
+
+For the same stack locally, run `npm run dev:worker` and open **<http://127.0.0.1:8790>**. The original Node/AWS adapters and `npm run dev` workflow are retained.
+
+The design reference is the [AWS Management Console](https://aws.amazon.com/console/). [REA](https://github.com/morluto/rea) was used for static analysis of the UI sources; browser tests validate interaction behavior. See the [design and verification record](docs/ui-redesign.md).
 
 ## AWS deployment
 
@@ -573,9 +598,14 @@ The default output is `out/tou-rates`; an explicit output directory may be passe
 | `npm run dev` | Build the MCP App and start server + web development processes |
 | `npm test` | Run the Vitest suite once |
 | `npm run test:watch` | Run tests interactively |
-| `npm run lint` | Run strict TypeScript checks across all workspaces; this script is type checking, not ESLint |
+| `npm run lint` | Run strict TypeScript checks across all workspaces and the Worker; this is type checking, not ESLint |
 | GitHub Actions (`.github/workflows/ci.yml`) | On every push/PR: `npm ci`, lint, test, build, and the standalone `tou-rates` export |
 | `npm run build` | Build tariff-package output, the single-file MCP App, and the web client |
+| `npm run build:worker` | Build the same-origin web client and complete Workers demo backend |
+| `npm run typecheck:worker` | Check the Worker and Durable Object types |
+| `npm run dev:worker` | Run the complete Workers deployment locally on port 8790 |
+| `npm run deploy` | Build and deploy to the configured Cloudflare account and free subdomain |
+| `npm run test:e2e` | Run browser checks against the local Workers stack (installed Google Chrome required) |
 | `npm run build:lambda` | Bundle server/executor and copy runtime assets for CDK |
 | `npm run cdk:synth` | Install infra dependencies and synthesize CloudFormation; no deployment |
 | `npm run inspector` | Start the pinned MCP Inspector |
@@ -592,9 +622,12 @@ The default output is `out/tou-rates`; an explicit output directory may be passe
 - Presence, never-off behavior, arrival, explanations, undo, and savings.
 - Adapter behavior using test doubles and local stores, including the Bedrock Converse request shape (verbatim system prompt, tools, no sampling parameters, speakable AWS errors) and Home Assistant service calls.
 - The web client's own conversation loop, run in Node through the LLM proxy (mock model) and the MCP server, turn by turn through the demo script.
+- Browser checks for all console controls, eight demo prompts, embedded/native screens, mock/scripted routing, typed messages, clock controls, occupancy, visitor isolation, refresh persistence, cross-origin rejection, and responsive navigation. Set `E2E_BASE_URL` to the deployed URL to run the same checks live; `UPDATE_SCREENSHOTS=1` refreshes the four README images from that run.
 - The complete default planning/execution scenario, including its exact fixture costs.
 
-**Documentation verification on October 19, 2026:** all **117 tests across 10 test files** passed, workspace type checks passed, the production build passed, and the local browser displayed the real MCP App proposal shown above. The Lambda bundle and local CDK synthesis also succeeded; the standalone `tou-rates` export installed, passed its **21 tests**, and built successfully. This is a recorded local check, not a continuous-integration badge or proof of live AWS/device integration.
+**Console verification on October 19, 2026:** all **123 tests across 11 test files**, workspace/Worker type checks, and the production Workers build passed. All **four browser scenarios** passed locally and against the deployed URL, including the full evening, every console control, fallbacks, visitor isolation, and responsive navigation. The four images above come from that live browser run.
+
+Earlier infrastructure checks recorded for this repository include successful Lambda packaging, local CDK synthesis, and a standalone `tou-rates` export with **21 tests** and a successful build. Those checks are separate from this UI/Workers release and do not establish live AWS or device operation.
 
 ## Repository map
 
@@ -636,7 +669,7 @@ For the presentation, see [DEMO_SCRIPT.md](DEMO_SCRIPT.md) and [SUBMISSION.md](S
 
 ## Security and privacy
 
-This is a **single-household development prototype**, not a hardened public smart-home service.
+This is a **development prototype**, not a hardened public smart-home service. The public Workers demo isolates simulated households by browser cookie and includes no paid or real-device integrations. The notes below apply to the configurable Node/AWS server, which can be connected to external services.
 
 - **Keep the demo on a trusted local network.** The server does not implement user authentication. CORS and Host-header checks are not authorization, and `app.listen(PORT)` does not explicitly restrict the API to loopback.
 - **Simulator administration is powerful.** `/sim/reset` clears state, and clock/motion endpoints change the world. Disable `SIM_ADMIN` for any non-demo environment and add proper access controls; doing so also disables the current simulator panels/events.
@@ -672,10 +705,10 @@ This is a **single-household development prototype**, not a hardened public smar
 | --- | --- |
 | Alexa+ | Browser simulator with real MCP calls; no native Echo/console connection is included. |
 | Language understanding | Mock/scripted mode supports its deterministic phrase router; it is not a general-purpose language model. Bedrock is optional. |
-| Cloud deployment | CDK, Lambda packaging, and adapters are included; the live deployment and actual AWS permissions have not been verified for this README. |
+| Cloud deployment | The public Workers demo is deployed and browser-tested. CDK, Lambda packaging, and AWS adapters are included; a live AWS deployment and its permissions remain unverified. |
 | Home Assistant | Optional mapped actions; no full live state synchronization or phone geofencing. |
 | Billing | Time-of-use energy model and labeled estimates; no claim of whole-bill accuracy or guaranteed savings. |
-| Reliability at scale | Local runtime locking and local JSON persistence target one process. Distributed coordination, retries, and production operational controls need further work. |
+| Reliability at scale | Workers serializes each visitor's demo in a Durable Object with persisted state. Node/JSON targets one process. Authenticated accounts, service quotas, and production operational controls need further work. |
 | Publishing | `tou-rates` includes standalone export tooling; a separate public release is not asserted here. |
 
 [BACKLOG.md](BACKLOG.md) tracks deferred work, including higher billing tiers, demand charges, solar/export accounting, thermal modeling, learned behavior, multi-household authentication, a mobile app, and geofencing.

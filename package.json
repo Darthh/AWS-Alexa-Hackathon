@@ -20,15 +20,24 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "npm run build --workspaces --if-present",
-    "lint": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run typecheck --workspaces --if-present && npm run typecheck:worker",
     "inspector": "npx -y @modelcontextprotocol/inspector@0.22.0",
     "bedrock:models": "node scripts/bedrock-models.mjs",
     "build:lambda": "npm run build:lambda -w @off-peak/server",
-    "cdk:synth": "cd infra && npm install && npx cdk synth"
+    "cdk:synth": "cd infra && npm install && npx cdk synth",
+    "build:worker": "npm run build -w tou-rates && npm run build -w @off-peak/ui-apps && npm run build -w @off-peak/web -- --mode worker && node scripts/build-worker.mjs",
+    "deploy": "npm run build:worker && wrangler deploy",
+    "dev:worker": "npm run build:worker && wrangler dev --port 8790",
+    "typecheck:worker": "tsc -p worker/tsconfig.json",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261019.1",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^22.19.0",
+    "esbuild": "^0.28.2",
     "typescript": "6.0.3",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "wrangler": "^4.151.2"
   }
 }

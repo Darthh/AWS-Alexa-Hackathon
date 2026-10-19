@@ -1,4 +1,7 @@
-import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
+import {
+  AppBridge,
+  PostMessageTransport,
+} from "@modelcontextprotocol/ext-apps/app-bridge";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import "@off-peak/ui-apps/timeline.css";
 import { renderView } from "@off-peak/ui-apps/timeline";
@@ -25,7 +28,17 @@ export function NativeView({ payload }: { payload: ScreenPayload | null }) {
  * Hosts ui://off-peak/plan.html in a sandboxed iframe and talks to it over the MCP Apps
  * postMessage protocol (ui/initialize, tool-input, tool-result, resource-teardown) via ext-apps' AppBridge.
  */
-export function McpAppView({ html, conn, payload, onFail }: { html: string; conn: McpConn; payload: ScreenPayload | null; onFail: () => void }) {
+export function McpAppView({
+  html,
+  conn,
+  payload,
+  onFail,
+}: {
+  html: string;
+  conn: McpConn;
+  payload: ScreenPayload | null;
+  onFail: () => void;
+}) {
   const frame = useRef<HTMLIFrameElement>(null);
   const bridge = useRef<AppBridge | null>(null);
   const ready = useRef(false);
@@ -35,7 +48,8 @@ export function McpAppView({ html, conn, payload, onFail }: { html: string; conn
 
   const deliver = async () => {
     const p = latest.current;
-    if (!bridge.current || !ready.current || !p || sent.current === p.seq) return;
+    if (!bridge.current || !ready.current || !p || sent.current === p.seq)
+      return;
     sent.current = p.seq;
     await bridge.current.sendToolInput({ arguments: p.args });
     await bridge.current.sendToolResult(p.result);
@@ -54,7 +68,9 @@ export function McpAppView({ html, conn, payload, onFail }: { html: string; conn
       conn.client,
       { name: "Alexa+ simulator", version: "0.1.0" },
       { serverTools: {}, logging: {} },
-      { hostContext: { theme: "dark", displayMode: "inline", platform: "web" } },
+      {
+        hostContext: { theme: "light", displayMode: "inline", platform: "web" },
+      },
     );
     b.oninitialized = () => {
       if (cancelled) return;
@@ -64,7 +80,9 @@ export function McpAppView({ html, conn, payload, onFail }: { html: string; conn
     };
     bridge.current = b;
     const connected = b
-      .connect(new PostMessageTransport(iframe.contentWindow!, iframe.contentWindow!))
+      .connect(
+        new PostMessageTransport(iframe.contentWindow!, iframe.contentWindow!),
+      )
       .then(() => {
         if (!cancelled) iframe.srcdoc = html;
       })
@@ -90,5 +108,13 @@ export function McpAppView({ html, conn, payload, onFail }: { html: string; conn
     void deliver();
   }, [payload]);
 
-  return <iframe ref={frame} title="Off-Peak plan (MCP App)" className="screen-fill app-frame" sandbox="allow-scripts" data-status={status} />;
+  return (
+    <iframe
+      ref={frame}
+      title="Off-Peak plan (MCP App)"
+      className="screen-fill app-frame"
+      sandbox="allow-scripts"
+      data-status={status}
+    />
+  );
 }

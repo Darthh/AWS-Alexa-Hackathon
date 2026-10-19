@@ -44,6 +44,11 @@ One line per decision, newest at the bottom of each section.
 - 2026-10-19 · After a turn with no UI-bound tool result, the host refreshes the Echo Show with `get_home_status` (what a real screen device would show).
 - 2026-10-19 · The MCP App is hosted with ext-apps' `AppBridge` in a `sandbox="allow-scripts"` srcdoc iframe; on any failure within 4 s the web client renders the same view natively from `structuredContent` (shared renderer in `packages/ui-apps/src/timeline.ts`).
 
+## Console and public demo
+- 2026-10-19 · Use the AWS console as the UI reference while retaining React/Vite, every existing control, the conversation loop, and the shared MCP App/native renderer.
+- 2026-10-19 · Host the no-key demo on `offpeak.patrickvaldivia123.workers.dev`. Reuse the Express/MCP server via the Workers Node HTTP adapter; isolate and persist each browser's simulated household in a SQLite Durable Object. Keep the original Node/AWS integrations intact.
+- 2026-10-19 · The Worker build embeds fixtures and screen HTML and always uses same-origin APIs. It never reads AWS/model/device credentials from local deployment configuration. Browser tests and live screenshots cover the public demo; AWS/Echo operation remains a separate boundary.
+
 ## AWS deploy & open source
 - 2026-10-19 · Lambda bundle is built with Vite SSR (`vite.lambda.config.ts`, `noExternal: true`) instead of adding esbuild for CDK `NodejsFunction`; CDK uses `Code.fromAsset(dist-lambda)`.
 - 2026-10-19 · MCP server on Lambda runs the unmodified Express app behind the AWS Lambda Web Adapter layer (`run.sh` → `node main.mjs`, port 8080). The layer version is a CDK context value (`lambdaWebAdapterLayerVersion`, default 25 — verify before deploy).

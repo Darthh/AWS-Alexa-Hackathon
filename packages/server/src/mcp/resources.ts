@@ -59,6 +59,6 @@ export function registerResources(server: McpServer, rt: Runtime): void {
       mimeType: MCP_APP_MIME,
       _meta: { ui: { prefersBorder: false } },
     },
-    async (uri) => ({ contents: [{ uri: uri.href, mimeType: MCP_APP_MIME, text: planAppHtml() }] }),
+    async (uri) => ({ contents: [{ uri: uri.href, mimeType: MCP_APP_MIME, text: rt.planAppHtml ?? planAppHtml() }] }),
   );
 }

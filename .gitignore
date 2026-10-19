@@ -10,3 +10,6 @@ infra/cdk.out/
 infra/node_modules/
 packages/server/dist-lambda/
 out/
+.wrangler/
+test-results/
+playwright-report/

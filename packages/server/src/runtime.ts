@@ -17,6 +17,8 @@ import { DEFAULT_OCCUPANCY } from "./services/presence.ts";
 import { onTick } from "./services/tick.ts";
 
 export interface Runtime {
+  /** Prebundled screen for runtimes without a repository filesystem (e.g. Workers). */
+  planAppHtml?: string;
   config: Config;
   clock: Clock;
   timezone: string;
@@ -39,6 +41,7 @@ export interface Runtime {
 }
 
 export interface RuntimeOverrides {
+  planAppHtml?: string;
   clock?: Clock;
   store?: Store;
   tariffs?: TariffSource;
@@ -117,6 +120,7 @@ export async function createRuntime(config: Config, overrides: RuntimeOverrides 
   events.setMaxListeners(100);
 
   const rt: Runtime = {
+    planAppHtml: overrides.planAppHtml,
     config,
     clock,
     timezone,
