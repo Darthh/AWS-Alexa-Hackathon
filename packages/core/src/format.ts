@@ -22,9 +22,10 @@ export function speakRange(from: Instant, to: Instant, timezone: string): string
   return formatRange(toDateTime(from, timezone), toDateTime(to, timezone));
 }
 
-/** "the washer" from "Washer"; keeps proper names like "PC + monitors" readable. */
+/** "the washer" from "Washer"; keeps acronyms like "TV" and "Wi-Fi router" intact. */
 export function the(name: string): string {
-  return `the ${name.charAt(0).toLowerCase()}${name.slice(1)}`;
+  // Lowercase ordinary capitalized words ("Washer" → "washer") but keep "TV", "Wi-Fi router", "PC".
+  return /^[A-Z][a-z]+(\s|$)/.test(name) ? `the ${name.charAt(0).toLowerCase()}${name.slice(1)}` : `the ${name}`;
 }
 
 /** ["a"] → "a"; ["a","b"] → "a and b"; ["a","b","c"] → "a, b, and c". */

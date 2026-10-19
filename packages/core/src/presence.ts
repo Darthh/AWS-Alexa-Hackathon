@@ -34,10 +34,14 @@ export function isOnStandby(d: Device): boolean {
   return d.standbyW !== undefined && d.state.on && !d.state.running && d.state.powerW <= d.standbyW + 2;
 }
 
-/** Standby devices in zones with no motion for ≥ 30 minutes (never-off devices excluded). */
+/**
+ * Standby devices in zones with no motion for ≥ 30 minutes (never-off devices excluded).
+ * Anything switched on in the last 30 minutes (by a person or a restore) is left alone.
+ */
 export function idleCandidates(h: Household, now: number): Device[] {
   return h.devices.filter((d) => {
     if (!isOnStandby(d) || isNeverOff(h, d)) return false;
+    if (d.state.lastActiveAt && (now - ms(d.state.lastActiveAt)) / MINUTE < IDLE_AFTER_MIN) return false;
     const z = h.zones.find((x) => x.id === d.zoneId);
     if (!z || z.shared) return false;
     if (h.mode === "zone" && h.activeZones.includes(z.id)) return false;

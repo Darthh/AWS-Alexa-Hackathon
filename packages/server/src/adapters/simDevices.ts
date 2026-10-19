@@ -14,7 +14,7 @@ export function defaultOnPowerW(d: Device): number {
 export function nextState(d: Device, change: Partial<DeviceState>, at: Date): DeviceState {
   const s: DeviceState = { ...d.state, ...change };
   if (change.on === false) {
-    s.running = false;
+    if (s.running) s.running = false;
     s.powerW = 0;
   } else if (change.on === true && change.powerW === undefined && !d.state.on) {
     s.powerW = defaultOnPowerW(d);

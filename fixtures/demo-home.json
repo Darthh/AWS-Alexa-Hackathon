@@ -26,7 +26,7 @@
     {
       "id": "washer", "name": "Washer", "aliases": ["washing machine", "laundry", "clothes washer"],
       "zoneId": "laundry", "kind": "washer", "ratedKw": 0.5,
-      "cycle": { "durationMin": 60, "energyKwh": 0.5, "interruptible": false },
+      "cycle": { "durationMin": 90, "energyKwh": 0.5, "interruptible": false },
       "noisy": true, "flexible": true, "state": { "on": false, "powerW": 0 }
     },
     {

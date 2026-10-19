@@ -47,7 +47,7 @@ describe("golden scenario: weekday 5:30 PM, DEMO_TOU", () => {
     expect(ms(dryer.end)).toBeLessThanOrEqual(ms("2026-10-19T22:00:00-07:00"));
     expect(ms(dryer.start)).toBeGreaterThanOrEqual(ms(washer.end));
     expect(dryer.reason).toBe("Peak ends at 9 PM; finishes at 10 PM, before quiet hours.");
-    expect(washer.reason).toBe("Starts now so the dryer can finish before quiet hours at 10 PM; done by 6:30 PM.");
+    expect(washer.reason).toBe("Starts now so the dryer can finish before quiet hours at 10 PM; done by 7 PM.");
   });
 
   it("no noisy step overlaps 22:00–07:00", () => {
@@ -185,7 +185,7 @@ describe("planner constraints", () => {
       { deviceId: "dryer", finishBy: "2026-10-25T07:00:00-07:00" },
     ]);
     expect(one(sat, "washer").start).toBe("2026-10-24T17:30:00-07:00");
-    expect(one(sat, "dryer").start).toBe("2026-10-24T18:30:00-07:00");
+    expect(one(sat, "dryer").start).toBe("2026-10-24T19:00:00-07:00");
     expect(sat.savingsCents).toBe(0);
   });
 

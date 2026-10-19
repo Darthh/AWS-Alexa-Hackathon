@@ -82,6 +82,8 @@ interface PlaceOpts {
 const EPS = 1e-9;
 const SLOT_H = SLOT_MS / HOUR;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
+/** Integer cents, immune to float noise like 24.4999999 (money rounds at the end of each step). */
+const roundCents = (c: number) => Math.round(Math.round(c * 1e6) / 1e6);
 
 // ───────────────────────── task resolution ─────────────────────────
 
@@ -294,7 +296,7 @@ function baselineCosts(tasks: Task[], ctx: Ctx): Map<DeviceId, number> {
       }
     }
     ends.set(t.device.id, at);
-    costs.set(t.device.id, Math.round(cost));
+    costs.set(t.device.id, roundCents(cost));
   }
   return costs;
 }
@@ -360,7 +362,7 @@ function conflictFor(t: Task, ctx: Ctx, maxEnergy: number): Conflict {
   const options: ConflictOption[] = [];
   const add = (label: string, cost: number | null, change: ConflictOption["change"]) => {
     if (cost === null || options.length >= 3) return;
-    const extra = Math.max(0, Math.round(cost - ideal));
+    const extra = Math.max(0, roundCents(cost - ideal));
     options.push({ label: extra > 0 ? `${label} (+${dollars(extra)})` : label, extraCostCents: extra, change });
   };
 
@@ -499,7 +501,7 @@ export function plan(
     const p = placements.get(t.device.id);
     if (!p) continue;
     if (!t.interruptible) {
-      const cost = Math.round(p.cost);
+      const cost = roundCents(p.cost);
       taskCost.set(t.device.id, cost);
       steps.push({
         deviceId: t.device.id,
@@ -528,7 +530,7 @@ export function plan(
     const lastEnd = runs.at(-1)!.end;
     let total = 0;
     for (const r of runs) {
-      const cost = Math.round(r.cost);
+      const cost = roundCents(r.cost);
       total += cost;
       steps.push({
         deviceId: t.device.id,

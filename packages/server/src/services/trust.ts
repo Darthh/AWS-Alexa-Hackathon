@@ -102,7 +102,8 @@ export async function undo(rt: Runtime, h: Household, actionId?: string): Promis
 
   const groupId = rt.newId("undo");
   const restored: { deviceId: string; name: string }[] = [];
-  let undid = "";
+  const modeNote = targets.find((e) => e.meta?.kind === "mode");
+  let undid = modeNote ? `${modeNote.action.replace("mode:", "")} mode` : targets.some((e) => e.meta?.kind === "plan") ? "the schedule" : "";
   for (const e of [...targets].reverse()) {
     if (e.meta?.kind === "plan") {
       const planId = String(e.meta.planId);

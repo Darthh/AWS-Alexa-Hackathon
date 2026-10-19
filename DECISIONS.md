@@ -32,3 +32,4 @@ One line per decision, newest at the bottom of each section.
 - 2026-10-19 · EV charging is split into steps wherever the charge power changes (load headroom), so per-step kW is exact.
 - 2026-10-19 · Shift savings are attributed per executed step (task baseline − task plan cost, by kWh share), so the ledger fills in as the night runs.
 - 2026-10-19 · Estimated savings (excluded from headline unless `includeEstimates`): cooling setback 0.05 kWh per °F per hour (≈3%/°F of a 3.5 kW AC at ~50% duty); water heater eco 0.1 kWh/h. Idle/away savings use the device's measured draw before it was switched off × slot price until it came back on.
+- 2026-10-19 · Washer cycle is 90 min (spec seed says 60) so Scene 2 at 6:45 PM has a running washer that away mode must not interrupt; golden-scenario costs and savings are unchanged ($7.74).
