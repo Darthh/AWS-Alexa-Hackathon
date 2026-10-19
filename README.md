@@ -574,6 +574,7 @@ The default output is `out/tou-rates`; an explicit output directory may be passe
 | `npm test` | Run the Vitest suite once |
 | `npm run test:watch` | Run tests interactively |
 | `npm run lint` | Run strict TypeScript checks across all workspaces; this script is type checking, not ESLint |
+| GitHub Actions (`.github/workflows/ci.yml`) | On every push/PR: `npm ci`, lint, test, build, and the standalone `tou-rates` export |
 | `npm run build` | Build tariff-package output, the single-file MCP App, and the web client |
 | `npm run build:lambda` | Bundle server/executor and copy runtime assets for CDK |
 | `npm run cdk:synth` | Install infra dependencies and synthesize CloudFormation; no deployment |
@@ -589,7 +590,8 @@ The default output is `out/tou-rates`; an explicit output directory may be passe
 - Natural-language time/rule parsing and the scripted intent router.
 - MCP protocol negotiation and tools over real Streamable HTTP.
 - Presence, never-off behavior, arrival, explanations, undo, and savings.
-- Adapter behavior using test doubles and local stores.
+- Adapter behavior using test doubles and local stores, including the Bedrock Converse request shape (verbatim system prompt, tools, no sampling parameters, speakable AWS errors) and Home Assistant service calls.
+- The web client's own conversation loop, run in Node through the LLM proxy (mock model) and the MCP server, turn by turn through the demo script.
 - The complete default planning/execution scenario, including its exact fixture costs.
 
 **Documentation verification on October 19, 2026:** all **117 tests across 10 test files** passed, workspace type checks passed, the production build passed, and the local browser displayed the real MCP App proposal shown above. The Lambda bundle and local CDK synthesis also succeeded; the standalone `tou-rates` export installed, passed its **21 tests**, and built successfully. This is a recorded local check, not a continuous-integration badge or proof of live AWS/device integration.

@@ -8,6 +8,16 @@ import { mockConverse, type ConverseMessage } from "./mock.ts";
 export const SYSTEM_PROMPT =
   "You are Alexa+, speaking aloud in a home. Use the Off-Peak tools for anything about electricity cost, when to run appliances, leaving or arriving home, which rooms are in use, or saving money. Call plan_tasks before apply_plan, and ask the user to confirm unless they already said to go ahead. Reply in at most two short sentences, based on the tool's text. Never invent prices, times, or savings; only state numbers returned by tools. Use 12-hour times.";
 
+/** Minimal client surface (BedrockRuntimeClient / PollyClient), injectable for tests. */
+export interface AwsClient {
+  send(command: unknown): Promise<any>;
+}
+
+export interface LlmDeps {
+  bedrock?: AwsClient;
+  polly?: AwsClient;
+}
+
 interface ToolSpec {
   toolSpec: { name: string; description?: string; inputSchema: { json: Record<string, unknown> } };
 }
@@ -26,7 +36,7 @@ function clockContext(rt: Runtime): string {
  * LLM proxy for the web simulator (not part of MCP). The browser owns the loop and calls MCP itself;
  * this route only turns messages + tool specs into the next model message.
  */
-export function llmRouter(rt: Runtime): Router {
+export function llmRouter(rt: Runtime, deps: LlmDeps = {}): Router {
   const r = Router();
   r.use(express.json({ limit: "2mb" }));
   const { config } = rt;
@@ -58,8 +68,8 @@ export function llmRouter(rt: Runtime): Router {
     }
     try {
       const { BedrockRuntimeClient, ConverseCommand } = await import("@aws-sdk/client-bedrock-runtime");
-      const client = new BedrockRuntimeClient({ region: config.awsRegion });
-      const out = await client.send(
+      deps.bedrock ??= new BedrockRuntimeClient({ region: config.awsRegion });
+      const out = await deps.bedrock.send(
         new ConverseCommand({
           modelId: config.bedrockModelId,
           system: [{ text: SYSTEM_PROMPT }, { text: clockContext(rt) }],
@@ -93,11 +103,11 @@ export function llmRouter(rt: Runtime): Router {
     if (!text) return fail(res, 400, "text is required");
     try {
       const { PollyClient, SynthesizeSpeechCommand } = await import("@aws-sdk/client-polly");
-      const polly = new PollyClient({ region: config.awsRegion });
-      const out = await polly.send(
+      deps.polly ??= new PollyClient({ region: config.awsRegion });
+      const out = await deps.polly.send(
         new SynthesizeSpeechCommand({ Text: text.slice(0, 1500), VoiceId: pollyVoice as never, Engine: "neural", OutputFormat: "mp3" }),
       );
-      const bytes = await out.AudioStream?.transformToByteArray();
+      const bytes: Uint8Array | undefined = await out.AudioStream?.transformToByteArray();
       if (!bytes) return fail(res, 502, "Polly returned no audio.");
       res.setHeader("Content-Type", "audio/mpeg");
       res.end(Buffer.from(bytes));

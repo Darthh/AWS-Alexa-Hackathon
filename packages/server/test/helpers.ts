@@ -2,6 +2,7 @@ import type { AddressInfo } from "node:net";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createApp } from "../src/app.ts";
+import type { LlmDeps } from "../src/llm/routes.ts";
 import { SimClock } from "../src/clock.ts";
 import { loadConfig } from "../src/config.ts";
 import { createRuntime, type Runtime } from "../src/runtime.ts";
@@ -20,11 +21,11 @@ export interface TestServer {
   close(): Promise<void>;
 }
 
-export async function startTestServer(env: Record<string, string> = {}, start = GOLDEN_START): Promise<TestServer> {
+export async function startTestServer(env: Record<string, string> = {}, start = GOLDEN_START, llm?: LlmDeps): Promise<TestServer> {
   const config = loadConfig({ STORE: "memory", SIM_ADMIN: "1", SIM_START: start, ...env });
   const clock = new SimClock(new Date(start));
   const rt = await createRuntime(config, { clock });
-  const app = createApp(rt);
+  const app = createApp(rt, { llm });
   const http = app.listen(0);
   await new Promise<void>((resolve) => http.once("listening", () => resolve()));
   const port = (http.address() as AddressInfo).port;

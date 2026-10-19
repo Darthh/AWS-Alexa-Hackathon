@@ -4,7 +4,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { logError } from "./log.ts";
 import { buildServer } from "./mcp/server.ts";
 import type { Runtime } from "./runtime.ts";
-import { llmRouter } from "./llm/routes.ts";
+import { llmRouter, type LlmDeps } from "./llm/routes.ts";
 import { simRouter } from "./sim/routes.ts";
 
 const ALLOW_HEADERS = "content-type, accept, mcp-protocol-version, mcp-session-id, authorization, last-event-id";
@@ -36,7 +36,7 @@ function methodNotAllowed(_req: Request, res: Response) {
     .json({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed (stateless server: POST only)." }, id: null });
 }
 
-export function createApp(rt: Runtime) {
+export function createApp(rt: Runtime, opts: { llm?: LlmDeps } = {}) {
   const app = express();
   app.disable("x-powered-by");
   app.use(cors(rt.config.webOrigin));
@@ -69,7 +69,7 @@ export function createApp(rt: Runtime) {
   app.delete("/mcp", methodNotAllowed);
 
   if (rt.config.simAdmin) app.use("/sim", simRouter(rt));
-  app.use("/llm", llmRouter(rt));
+  app.use("/llm", llmRouter(rt, opts.llm));
 
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     logError("http", err);
