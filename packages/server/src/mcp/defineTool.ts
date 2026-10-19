@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { OffPeakError } from "@off-peak/core";
-import type { z } from "zod";
+import { z as zod, type z } from "zod";
 import { log, logError } from "../log.ts";
 import type { Runtime } from "../runtime.ts";
 
@@ -32,15 +32,25 @@ export function defineTool<I extends z.ZodRawShape, O extends z.ZodRawShape>(def
   return def;
 }
 
+export const ERROR_META_KEY = "offpeak/error";
+
+/**
+ * Domain errors: speakable text + machine-readable details in `_meta`. Not in `structuredContent`:
+ * SDK v1 clients validate structuredContent against the tool's outputSchema even when isError is set
+ * (see FRICTION_LOG.md), so an `{ error }` payload would make the client throw instead of speaking.
+ */
 function errorResult(code: string, message: string, details?: Record<string, unknown>): CallToolResult {
   return {
     isError: true,
     content: [{ type: "text", text: message }],
-    structuredContent: { error: { code, message, ...details } },
+    _meta: { [ERROR_META_KEY]: { code, message, ...details } },
   };
 }
 
+const outputParsers = new WeakMap<ToolDef, z.ZodObject<z.ZodRawShape>>();
+
 export function registerTool(server: McpServer, rt: Runtime, def: ToolDef): void {
+  if (!outputParsers.has(def)) outputParsers.set(def, zod.object(def.output));
   server.registerTool(
     def.name,
     {
@@ -56,8 +66,15 @@ export function registerTool(server: McpServer, rt: Runtime, def: ToolDef): void
       const ms = () => Math.round(performance.now() - started);
       try {
         const { text, data } = await def.run(args as Out<z.ZodRawShape>, rt);
+        // Generated output schemas are closed (additionalProperties: false); strip anything extra.
+        const parsed = outputParsers.get(def)!.safeParse(data);
+        if (!parsed.success) {
+          logError(`tool.${def.name}.output`, parsed.error);
+          log({ tool: def.name, ms: ms(), ok: false, code: "output_schema" });
+          return errorResult("internal", "Sorry, Off-Peak hit a problem with that. Please try again in a moment.");
+        }
         log({ tool: def.name, ms: ms(), ok: true });
-        return { content: [{ type: "text", text }], structuredContent: data as Record<string, unknown> };
+        return { content: [{ type: "text", text }], structuredContent: parsed.data as Record<string, unknown> };
       } catch (err) {
         if (err instanceof OffPeakError) {
           log({ tool: def.name, ms: ms(), ok: false, code: err.code });

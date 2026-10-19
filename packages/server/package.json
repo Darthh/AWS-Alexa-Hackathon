@@ -13,6 +13,11 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1153.0",
+    "@aws-sdk/client-dynamodb": "^3.1153.0",
+    "@aws-sdk/client-polly": "^3.1153.0",
+    "@aws-sdk/client-scheduler": "^3.1152.0",
+    "@aws-sdk/lib-dynamodb": "^3.1153.0",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@off-peak/core": "0.1.0",
     "express": "^5.2.1",

@@ -92,3 +92,24 @@ describe("fetchRatePlans", () => {
     await expect(fetchRatePlans("abc", "k", fetchImpl)).rejects.toThrow(/ZIP/);
   });
 });
+
+describe("per-month period naming", () => {
+  it("splits a period that is peak in one season and mid-peak in another", () => {
+    // Period 1 (40¢) is the priciest in winter but only the middle level in summer (period 2 is 60¢).
+    const winter = Array.from({ length: 24 }, (_, h) => (h >= 16 && h < 21 ? 1 : 0));
+    const summer = Array.from({ length: 24 }, (_, h) => (h >= 16 && h < 21 ? 2 : h >= 21 ? 1 : 0));
+    const sched = Array.from({ length: 12 }, (_, m) => (m >= 5 && m <= 8 ? summer : winter));
+    const t = normalize({
+      label: "split",
+      utility: "U",
+      name: "Seasonal TOU",
+      energyratestructure: [[{ rate: 0.3 }], [{ rate: 0.4 }], [{ rate: 0.6 }]],
+      energyweekdayschedule: sched,
+      energyweekendschedule: sched,
+    });
+    expect(describeDay(t, "2026-01-14")).toBe("Peak 4–9 PM today; cheapest midnight–4 PM and 9 PM–midnight.");
+    expect(describeDay(t, "2026-07-15")).toBe("Peak 4–9 PM today; cheapest midnight–4 PM.");
+    expect(priceAt(t, "2026-07-15T22:00:00-07:00")).toMatchObject({ centsPerKwh: 40, periodName: "off-peak" });
+    expect(priceAt(t, "2026-01-14T17:00:00-08:00")).toMatchObject({ centsPerKwh: 40, periodName: "peak" });
+  });
+});

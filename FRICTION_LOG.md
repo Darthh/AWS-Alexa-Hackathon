@@ -28,3 +28,48 @@ Issues we hit with SDKs, docs, and tools while building Off-Peak, logged as they
 - Severity: minor
 - Workaround: Pin `typescript@6.0.3`.
 - Suggestion: n/a (ecosystem transition); worth a note in MCP SDK templates that pin TS.
+
+### SDK v1 client validates `structuredContent` against `outputSchema` even on `isError` results
+- Task attempted: Return speakable domain errors as `isError: true` with machine-readable details in `structuredContent.error` from tools that declare an `outputSchema`.
+- Steps taken: Server returned `{ isError: true, content: [...], structuredContent: { error } }`; called it from `Client.callTool` (SDK 1.32.1).
+- Expected: The client skips output validation for error results. The comment in `client/index.js` says so ("Only validate structured content if present (not when there's an error)"), and the server-side `McpServer.validateToolOutput` does skip `isError` results.
+- Actual: The client validates any present `structuredContent` and throws `McpError -32602: Structured content does not match the tool's output schema`, so the user never hears the speakable error.
+- Severity: major
+- Workaround: Errors carry only `content` text + `isError`, with details in `_meta["offpeak/error"]`.
+- Suggestion: Make the client match the server (skip validation when `isError`), or document that error results must also satisfy the output schema; clarify this in the spec text for `outputSchema`.
+
+### Zod → JSON Schema output schemas are closed (`additionalProperties: false`)
+- Task attempted: Return domain objects (plans, ledger entries) as `structuredContent`.
+- Steps taken: Declared `outputSchema` as a Zod raw shape; returned objects with a few extra internal fields.
+- Expected: Extra fields are tolerated or stripped.
+- Actual: The generated JSON Schema sets `additionalProperties: false` at every level, so SDK clients reject the whole result.
+- Severity: minor
+- Workaround: Our tool wrapper parses every result through `z.object(outputShape)` (which strips unknown keys) before returning.
+- Suggestion: Strip unknown keys server-side in `McpServer` before validating, or document the closed-object behavior next to `registerTool`.
+
+### MCP Inspector CLI coerces `--tool-arg zip=94110` to a number
+- Task attempted: Call `find_rate_plans` from the Inspector CLI with a ZIP code.
+- Steps taken: `--method tools/call --tool-name find_rate_plans --tool-arg zip=94110`.
+- Expected: A string argument (the schema says `type: string`).
+- Actual: The CLI JSON-parses the value and sends `94110` (number); input validation fails.
+- Severity: minor
+- Workaround: The tool accepts a string or a number and normalizes to a 5-digit string (LLMs do the same thing).
+- Suggestion: Coerce `--tool-arg` values using the tool's `inputSchema` types.
+
+### OpenEI URDB: address lookups return stale rates first
+- Task attempted: Find current residential TOU rates for a ZIP (`address=<zip>&limit=50`).
+- Steps taken: Queried 92614 (SCE territory) and 94110.
+- Expected: Current tariffs first.
+- Actual: 2016 tariffs with no `enddate` came back first and filled the page; current ones were missing. ZIP 94110 resolved only to the SF municipal utility. Fixed charges came as `fixedchargefirstmeter` in `$/day`, not `fixedmonthlycharge`. Period indices are sometimes reused across seasons with different relative prices.
+- Severity: major
+- Workaround: `orderby=startdate&direction=desc`, keep only the newest version per (utility, name), convert `$/day`/`$/year` fixed charges, and split re-used period indices per season when naming periods.
+- Suggestion: Default ordering by `startdate desc` and a `current=true` filter; one documented fixed-charge field.
+
+### OpenEI `DEMO_KEY` works but rate-limits quickly
+- Task attempted: Fetch real fixtures and test live lookups without signing up for a key.
+- Steps taken: Used `api_key=DEMO_KEY` (NREL convention).
+- Expected: Unclear; not documented on the OpenEI API page.
+- Actual: It works, then returns `OVER_RATE_LIMIT` after roughly ten calls in an hour.
+- Severity: minor
+- Workaround: Bundled three trimmed real responses in `fixtures/tariffs/`; the live adapter falls back to them on any error.
+- Suggestion: Document `DEMO_KEY` and its limits on the URDB API page.

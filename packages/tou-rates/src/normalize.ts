@@ -29,36 +29,50 @@ function flatSchedule(): number[][] {
   return Array.from({ length: 12 }, () => Array<number>(24).fill(0));
 }
 
-/** Names by price level within each month, then the most common name per period wins. */
-function namePeriods(cents: number[], weekday: number[][], weekend: number[][]): string[] {
-  const tally: Map<string, number>[] = cents.map(() => new Map());
-  for (let m = 0; m < 12; m++) {
-    const used = new Set([...(weekday[m] ?? []), ...(weekend[m] ?? [])]);
-    const levels = [...new Set([...used].map((i) => cents[i]!))].sort((a, b) => a - b);
-    const n = levels.length;
-    const levelName = (level: number): string => {
-      const rank = levels.indexOf(level);
-      if (n === 1) return "off-peak";
-      if (rank === n - 1) return "peak";
-      if (rank === 0) return n >= 3 ? "super off-peak" : "off-peak";
-      return rank === 1 && n >= 3 ? "off-peak" : "mid-peak";
-    };
-    for (const i of used) {
-      const name = levelName(cents[i]!);
-      tally[i]!.set(name, (tally[i]!.get(name) ?? 0) + 1);
-    }
-  }
-  return tally.map((t) => {
-    let best = "off-peak";
-    let count = 0;
-    for (const [name, c] of t) {
-      if (c > count) {
-        best = name;
-        count = c;
-      }
-    }
-    return best;
+/** Name for each price level within one month (cheapest → super off-peak/off-peak, priciest → peak). */
+function monthNames(cents: number[], used: Set<number>): Map<number, string> {
+  const levels = [...new Set([...used].map((i) => cents[i]!))].sort((a, b) => a - b);
+  const n = levels.length;
+  const levelName = (level: number): string => {
+    const rank = levels.indexOf(level);
+    if (n === 1) return "off-peak";
+    if (rank === n - 1) return "peak";
+    if (rank === 0) return n >= 3 ? "super off-peak" : "off-peak";
+    return rank === 1 && n >= 3 ? "off-peak" : "mid-peak";
+  };
+  return new Map([...used].map((i) => [i, levelName(cents[i]!)]));
+}
+
+/**
+ * Name periods by relative price per month. A period index reused across seasons can rank differently
+ * (peak in winter, mid-peak in summer); such periods are split into one entry per name so every month
+ * reads correctly, and the schedules are remapped to the new indices.
+ */
+function namePeriods(
+  cents: number[],
+  weekday: number[][],
+  weekend: number[][],
+): { periods: TariffPeriod[]; weekday: number[][]; weekend: number[][] } {
+  const perMonth = weekday.map((wk, m) => monthNames(cents, new Set([...wk, ...(weekend[m] ?? [])])));
+  const tally = cents.map(() => new Map<string, number>());
+  perMonth.forEach((names) => names.forEach((name, i) => tally[i]!.set(name, (tally[i]!.get(name) ?? 0) + 1)));
+
+  const periods: TariffPeriod[] = cents.map((c, index) => {
+    const best = [...tally[index]!].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "off-peak";
+    return { index, name: best, centsPerKwh: c };
   });
+  const extra = new Map<string, number>();
+  const indexFor = (i: number, name: string): number => {
+    if (periods[i]!.name === name) return i;
+    const key = `${i}|${name}`;
+    if (!extra.has(key)) {
+      extra.set(key, periods.length);
+      periods.push({ index: periods.length, name, centsPerKwh: cents[i]! });
+    }
+    return extra.get(key)!;
+  };
+  const remap = (schedule: number[][]) => schedule.map((hours, m) => hours.map((i) => indexFor(i, perMonth[m]!.get(i)!)));
+  return { periods, weekday: remap(weekday), weekend: remap(weekend) };
 }
 
 function fixedMonthlyCents(raw: OpenEIRate): number | undefined {
@@ -98,9 +112,8 @@ export function normalize(raw: OpenEIRate, opts: NormalizeOptions = {}): Normali
     weekend = weekday;
   }
 
-  const names = namePeriods(cents, weekday, weekend!);
-  const periods: TariffPeriod[] = cents.map((c, index) => ({ index, name: names[index]!, centsPerKwh: c }));
-  const isTou = weekday.some((month) => new Set(month).size > 1);
+  const named = namePeriods(cents, weekday, weekend!);
+  const isTou = weekday.some((month) => new Set(month.map((i) => cents[i])).size > 1);
 
   return {
     rateId: raw.label,
@@ -108,9 +121,9 @@ export function normalize(raw: OpenEIRate, opts: NormalizeOptions = {}): Normali
     name: raw.name,
     source: opts.source ?? "openei",
     timezone: opts.timezone ?? "America/Los_Angeles",
-    periods,
-    weekday,
-    weekend: weekend!,
+    periods: named.periods,
+    weekday: named.weekday,
+    weekend: named.weekend,
     fixedMonthlyCents: fixedMonthlyCents(raw),
     isTou,
     warnings,

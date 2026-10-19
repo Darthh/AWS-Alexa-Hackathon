@@ -1,0 +1,9 @@
+{
+  "tv": { "entity_id": "media_player.living_room_tv" },
+  "floor_lamp": { "entity_id": "light.living_room_floor_lamp" },
+  "kitchen_lights": { "entity_id": "light.kitchen" },
+  "pc": { "entity_id": "switch.office_pc_plug" },
+  "printer": { "entity_id": "switch.office_printer_plug" },
+  "thermostat": { "entity_id": "climate.home" },
+  "water_heater": { "entity_id": "water_heater.tank" }
+}

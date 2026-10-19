@@ -4,6 +4,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { logError } from "./log.ts";
 import { buildServer } from "./mcp/server.ts";
 import type { Runtime } from "./runtime.ts";
+import { simRouter } from "./sim/routes.ts";
 
 const ALLOW_HEADERS = "content-type, accept, mcp-protocol-version, mcp-session-id, authorization, last-event-id";
 const EXPOSE_HEADERS = "mcp-session-id";
@@ -65,6 +66,8 @@ export function createApp(rt: Runtime) {
   });
   app.get("/mcp", methodNotAllowed);
   app.delete("/mcp", methodNotAllowed);
+
+  if (rt.config.simAdmin) app.use("/sim", simRouter(rt));
 
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     logError("http", err);

@@ -34,6 +34,13 @@ export function joinAnd(items: string[]): string {
   return `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
 }
 
+/** ["a","b"] → "a or b"; ["a","b","c"] → "a, b, or c". */
+export function joinOr(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  if (items.length === 2) return `${items[0]} or ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, or ${items.at(-1)}`;
+}
+
 export function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }

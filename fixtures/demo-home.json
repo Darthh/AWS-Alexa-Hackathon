@@ -1,0 +1,134 @@
+{
+  "id": "demo-home",
+  "name": "Demo Home",
+  "timezone": "America/Los_Angeles",
+  "rateId": "DEMO_TOU",
+  "mode": "home",
+  "activeZones": [],
+  "autonomy": { "idleOff": "auto", "zoneOff": "auto" },
+  "awaySetpointF": 82,
+  "zones": [
+    { "id": "garage", "name": "Garage", "aliases": ["driveway"] },
+    { "id": "laundry", "name": "Laundry room", "aliases": ["laundry", "utility room"] },
+    { "id": "kitchen", "name": "Kitchen", "aliases": ["dining room"] },
+    { "id": "living_room", "name": "Living room", "aliases": ["lounge", "family room", "den", "tv room"] },
+    { "id": "office", "name": "Office", "aliases": ["study", "home office", "workroom"] },
+    { "id": "bedroom", "name": "Bedroom", "aliases": ["master bedroom", "main bedroom"] },
+    { "id": "whole_home", "name": "Whole home", "aliases": ["house", "everywhere", "whole house"], "shared": true }
+  ],
+  "devices": [
+    {
+      "id": "ev", "name": "Car", "aliases": ["car charger", "ev charger", "ev", "electric car", "electric vehicle", "tesla"],
+      "zoneId": "garage", "kind": "ev_charger", "ratedKw": 7.2,
+      "battery": { "capacityKwh": 75, "maxKw": 7.2, "socPercent": 35 },
+      "flexible": true, "state": { "on": false, "powerW": 0 }
+    },
+    {
+      "id": "washer", "name": "Washer", "aliases": ["washing machine", "laundry", "clothes washer"],
+      "zoneId": "laundry", "kind": "washer", "ratedKw": 0.5,
+      "cycle": { "durationMin": 60, "energyKwh": 0.5, "interruptible": false },
+      "noisy": true, "flexible": true, "state": { "on": false, "powerW": 0 }
+    },
+    {
+      "id": "dryer", "name": "Dryer", "aliases": ["clothes dryer", "tumble dryer"],
+      "zoneId": "laundry", "kind": "dryer", "ratedKw": 3.0,
+      "cycle": { "durationMin": 60, "energyKwh": 3.0, "interruptible": false },
+      "noisy": true, "flexible": true, "state": { "on": false, "powerW": 0 }
+    },
+    {
+      "id": "dishwasher", "name": "Dishwasher", "aliases": ["dishes", "dish washer"],
+      "zoneId": "kitchen", "kind": "dishwasher", "ratedKw": 0.6,
+      "cycle": { "durationMin": 120, "energyKwh": 1.2, "interruptible": false },
+      "noisy": false, "flexible": true, "state": { "on": false, "powerW": 0 }
+    },
+    {
+      "id": "fridge", "name": "Fridge", "aliases": ["refrigerator", "freezer"],
+      "zoneId": "kitchen", "kind": "fridge", "ratedKw": 0.15,
+      "flexible": false, "neverOff": true, "tags": ["food"], "state": { "on": true, "powerW": 150 }
+    },
+    {
+      "id": "kitchen_lights", "name": "Kitchen lights", "aliases": ["kitchen light"],
+      "zoneId": "kitchen", "kind": "light", "ratedKw": 0.06,
+      "flexible": false, "state": { "on": true, "powerW": 60 }
+    },
+    {
+      "id": "speaker_plug", "name": "Kitchen speaker plug", "aliases": ["smart speaker plug", "speaker plug", "kitchen speaker"],
+      "zoneId": "kitchen", "kind": "plug", "ratedKw": 0.01, "standbyW": 3,
+      "flexible": false, "state": { "on": true, "powerW": 3 }
+    },
+    {
+      "id": "tv", "name": "TV", "aliases": ["television", "living room tv", "telly"],
+      "zoneId": "living_room", "kind": "tv", "ratedKw": 0.12, "standbyW": 15,
+      "flexible": false, "state": { "on": true, "powerW": 15 }
+    },
+    {
+      "id": "console", "name": "Game console", "aliases": ["console", "xbox", "playstation", "games console"],
+      "zoneId": "living_room", "kind": "console", "ratedKw": 0.15, "standbyW": 12,
+      "flexible": false, "state": { "on": true, "powerW": 12 }
+    },
+    {
+      "id": "soundbar", "name": "Soundbar", "aliases": ["sound bar", "speakers"],
+      "zoneId": "living_room", "kind": "speaker", "ratedKw": 0.03, "standbyW": 8,
+      "flexible": false, "state": { "on": true, "powerW": 8 }
+    },
+    {
+      "id": "floor_lamp", "name": "Floor lamp", "aliases": ["living room lamp", "living room light"],
+      "zoneId": "living_room", "kind": "light", "ratedKw": 0.04,
+      "flexible": false, "state": { "on": true, "powerW": 40 }
+    },
+    {
+      "id": "pc", "name": "Office PC", "aliases": ["pc", "computer", "monitors", "desktop", "pc and monitors"],
+      "zoneId": "office", "kind": "pc", "ratedKw": 0.15, "standbyW": 20,
+      "flexible": false, "state": { "on": true, "powerW": 20 }
+    },
+    {
+      "id": "printer", "name": "Printer", "aliases": ["office printer"],
+      "zoneId": "office", "kind": "printer", "ratedKw": 0.4, "standbyW": 6,
+      "flexible": false, "state": { "on": true, "powerW": 6 }
+    },
+    {
+      "id": "desk_lamp", "name": "Desk lamp", "aliases": ["office lamp", "office light"],
+      "zoneId": "office", "kind": "light", "ratedKw": 0.01,
+      "flexible": false, "state": { "on": true, "powerW": 10 }
+    },
+    {
+      "id": "bedside_lamp", "name": "Bedside lamp", "aliases": ["bedroom lamp", "bedroom light", "night light"],
+      "zoneId": "bedroom", "kind": "light", "ratedKw": 0.008,
+      "flexible": false, "state": { "on": false, "powerW": 0 }
+    },
+    {
+      "id": "fan", "name": "Bedroom fan", "aliases": ["fan", "ceiling fan"],
+      "zoneId": "bedroom", "kind": "fan", "ratedKw": 0.045,
+      "flexible": false, "state": { "on": true, "powerW": 45 }
+    },
+    {
+      "id": "thermostat", "name": "Thermostat", "aliases": ["ac", "air conditioning", "air conditioner", "hvac", "cooling", "temperature"],
+      "zoneId": "whole_home", "kind": "thermostat", "ratedKw": 3.5,
+      "flexible": false, "state": { "on": true, "powerW": 0, "setpointF": 74 }
+    },
+    {
+      "id": "water_heater", "name": "Water heater", "aliases": ["hot water", "boiler"],
+      "zoneId": "whole_home", "kind": "water_heater", "ratedKw": 4.5,
+      "flexible": false, "state": { "on": true, "powerW": 0, "ecoMode": false }
+    },
+    {
+      "id": "router", "name": "Wi-Fi router", "aliases": ["router", "wifi", "wi fi", "internet", "modem"],
+      "zoneId": "whole_home", "kind": "router", "ratedKw": 0.012,
+      "flexible": false, "neverOff": true, "tags": ["network"], "state": { "on": true, "powerW": 12 }
+    },
+    {
+      "id": "aquarium", "name": "Aquarium", "aliases": ["fish tank", "aquarium heater", "fish"],
+      "zoneId": "whole_home", "kind": "aquarium", "ratedKw": 0.1,
+      "flexible": false, "neverOff": true, "state": { "on": true, "powerW": 80 }
+    }
+  ],
+  "rules": [
+    { "id": "rule_quiet", "type": "quiet_hours", "start": "22:00", "end": "07:00", "appliesTo": "noisy" },
+    { "id": "rule_ev_deadline", "type": "deadline", "deviceId": "ev", "by": "07:00", "targetPercent": 80, "days": ["mon", "tue", "wed", "thu", "fri"] },
+    { "id": "rule_never_fridge", "type": "never_off", "deviceId": "fridge" },
+    { "id": "rule_never_router", "type": "never_off", "deviceId": "router" },
+    { "id": "rule_never_aquarium", "type": "never_off", "deviceId": "aquarium" },
+    { "id": "rule_comfort", "type": "comfort", "minF": 68, "maxF": 78, "when": "occupied" },
+    { "id": "rule_max_load", "type": "max_load", "kw": 9.6 }
+  ]
+}
