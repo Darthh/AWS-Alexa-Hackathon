@@ -26,7 +26,7 @@ const APPLIANCE = /\b(car|ev|tesla|dish(es|washer)?|laundry|wash(er|ing)?|dryer|
 const ORDINALS: Record<string, number> = { first: 0, "1st": 0, second: 1, "2nd": 1, third: 2, "3rd": 2, fourth: 3, last: -1 };
 
 function clean(s: string): string {
-  return s.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9:%' ]+/g, " ").replace(/\s+/g, " ").trim();
+  return s.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9:%' ]+/g, " ").replace(/\s+/g, " ").trim().replace(/^alexa(?: |$)/, "");
 }
 
 /** "7" → "07:00" (morning deadline), "6:30" → "06:30", "7 am" → "07:00", "10 pm" → "22:00". */
@@ -111,6 +111,10 @@ export function routeUtterance(utterance: string, ctx: IntentContext = {}): Inte
 
   // Planning (before rules: "nothing loud after 10" often rides along)
   if (/\b(cheapest|best time|when should i|when's the cheapest|when is the cheapest)\b/.test(t)) {
+    // "Run it when cheapest" requests a proposal; "When is cheapest?" only asks for information.
+    const requestsAction = /^(?:please )?(?:(?:can|could|would) you (?:please )?)?(?:run|start|schedule|plan|charge|wash)\b/.test(t);
+    const proposal = requestsAction ? planTasks(t) : null;
+    if (proposal) return { name: "plan", calls: [proposal] };
     const dev = /\b(car|dishwasher|dishes|washer|dryer|laundry)\b/.exec(t)?.[1];
     const dur = /(\d+) ?(hours?|minutes?)/.exec(t);
     return one("cheapest", "find_cheapest_window", {

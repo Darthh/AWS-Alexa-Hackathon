@@ -46,6 +46,29 @@ describe("scripted intent router (demo script lines)", () => {
     expect(call("Undo that")).toEqual({ tool: "undo", args: {} });
   });
 
+  it.each([
+    "Alexa, run the dishwasher when power is cheapest",
+    "Please run the dishwasher when electricity is cheapest",
+    "Alexa, can you schedule the dishwasher for the cheapest time?",
+    "Start the dishwasher at the best time",
+  ])("proposes a schedule for an action request: %s", (utterance) => {
+    expect(call(utterance)).toEqual({
+      tool: "plan_tasks",
+      args: { tasks: [{ device: "dishwasher" }] },
+    });
+  });
+
+  it.each([
+    "Alexa, when is the cheapest time to run the dishwasher?",
+    "Can you tell me the best time to run the dishwasher?",
+  ])("keeps timing questions read-only: %s", (utterance) => {
+    expect(call(utterance)).toEqual({ tool: "find_cheapest_window", args: { device: "dishwasher" } });
+  });
+
+  it("accepts confirmation with the Alexa wake word", () => {
+    expect(call("Alexa, do it.")).toEqual({ tool: "apply_plan", args: {} });
+  });
+
   it("picks a rate plan from context", () => {
     expect(call("use the second one", { ratePlans: [{ rateId: "a", name: "A" }, { rateId: "b", name: "B" }] })).toEqual({
       tool: "select_rate_plan",

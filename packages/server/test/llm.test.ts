@@ -119,6 +119,51 @@ describe("web client conversation loop (mock LLM) through the real proxy and MCP
   });
 });
 
+describe("dishwasher cheapest-time request", () => {
+  it.each(["mock", "scripted"] as const)("proposes, confirms and runs the cycle through %s conversation", async (mode) => {
+    const s = await startTestServer();
+    let conn: McpConn | undefined;
+    try {
+      conn = await connectMcp(`${s.url}/mcp`, () => undefined);
+      const tools: ToolEvent[] = [];
+      const convo = new Conversation(conn, s.url, (e) => tools.push(e));
+      const ask = (text: string) => mode === "mock" ? convo.askLlm(text) : convo.askScripted(text);
+
+      const proposal = await ask("Alexa, run the dishwasher when power is cheapest");
+      expect(proposal.error).not.toBe(true);
+      expect(tools.map((t) => t.name)).toEqual(["plan_tasks"]);
+      expect(proposal.reply).toMatch(/Should I go ahead\?/);
+      const plans = await s.rt.store.listPlans();
+      expect(plans).toHaveLength(1);
+      expect(plans[0]).toMatchObject({ status: "proposed", savingsCents: 30, conflicts: [] });
+      expect(plans[0]!.steps).toHaveLength(1);
+      expect(plans[0]!.steps[0]).toMatchObject({
+        deviceId: "dishwasher",
+        start: "2026-10-20T00:00:00-07:00",
+        end: "2026-10-20T02:00:00-07:00",
+      });
+      expect(await s.rt.store.listJobs()).toHaveLength(0);
+
+      const approval = await ask("Alexa, do it.");
+      expect(approval.error).not.toBe(true);
+      expect(tools.map((t) => t.name)).toEqual(["plan_tasks", "apply_plan"]);
+      expect((await s.rt.store.listPlans())[0]!.status).toBe("applied");
+      expect(await s.rt.store.listJobs()).toHaveLength(2);
+      const dishwasher = async () => (await s.rt.household()).devices.find((d) => d.id === "dishwasher")!;
+      await jump(s, "2026-10-19T23:59:00-07:00");
+      expect(Boolean((await dishwasher()).state.running)).toBe(false);
+      await jump(s, "2026-10-20T00:00:00-07:00");
+      expect((await dishwasher()).state.running).toBe(true);
+      await jump(s, "2026-10-20T02:00:00-07:00");
+      expect((await dishwasher()).state.running).toBe(false);
+      expect((await s.rt.store.listJobs()).every((job) => job.status === "done")).toBe(true);
+    } finally {
+      await conn?.client.close();
+      await s.close();
+    }
+  });
+});
+
 describe("Home Assistant gateway", () => {
   it("maps device changes to HA service calls and leaves unmapped devices simulated", async () => {
     const calls: { url: string; body: unknown; auth: string | null }[] = [];

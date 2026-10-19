@@ -158,6 +158,8 @@ The authoritative seed is [`fixtures/demo-home.json`](fixtures/demo-home.json).
 
 ### A short presentation sequence
 
+For a single appliance, type **“Alexa, run the dishwasher when power is cheapest.”** Off-Peak proposes the lowest-cost feasible cycle within its planning window while respecting household rules. Say **“Do it”** (or **“Alexa, do it”**) or click **Approve this plan** to schedule it. In the default synthetic weekday demo, it runs midnight–2 AM, about $0.30 cheaper than starting at 5:30 PM. Asking **“When is the cheapest time to run the dishwasher?”** only returns timing information and creates no plan. This works in both mock conversation and scripted mode; actual Alexa/Echo and dishwasher hardware are not connected to the public simulator.
+
 | Step | Say, type, or click | What to show |
 | --- | --- | --- |
 | **1. Make a plan** | “I need the car charged by 7, dishes and laundry done tonight, nothing loud after 10.” | Proposed timeline, constraint checks, and the request for confirmation. The demo already includes the quiet-hours rule. |
