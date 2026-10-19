@@ -1,0 +1,7 @@
+{
+  "name": "@off-peak/ui-apps",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module"
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@off-peak/core",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "luxon": "^3.7.2",
+    "tou-rates": "0.1.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.7.6"
+  }
+}

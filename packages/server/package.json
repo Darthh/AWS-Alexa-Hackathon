@@ -1,0 +1,27 @@
+{
+  "name": "@off-peak/server",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --watch src/main.ts",
+    "start": "node --env-file-if-exists=../../.env src/main.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@off-peak/core": "0.1.0",
+    "express": "^5.2.1",
+    "luxon": "^3.7.2",
+    "tou-rates": "0.1.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/luxon": "^3.7.6"
+  }
+}
