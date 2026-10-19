@@ -32,7 +32,7 @@ export async function activeSteps(rt: Runtime): Promise<{ plan: Plan; stepId: st
     if (start.status === "pending") out.push({ plan, stepId: start.stepId!, job: start, status: "scheduled" });
     else if (start.status === "done" && end?.status === "pending") out.push({ plan, stepId: start.stepId!, job: start, status: "running" });
   }
-  return out.sort((a, b) => ms(a.job.at) - ms(b.job.at));
+  return out.sort((a, b) => ms(a.job.at) - ms(b.job.at) || (a.job.deviceId ?? "").localeCompare(b.job.deviceId ?? ""));
 }
 
 export async function timelineRowsFromSteps(rt: Runtime, h: Household): Promise<TimelineRow[]> {

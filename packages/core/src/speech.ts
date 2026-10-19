@@ -41,7 +41,7 @@ export function describePlan(plan: Plan, h: Household, now: number, opts: { demo
 
   const conflict = plan.conflicts[0];
   if (conflict) {
-    const opts2 = conflict.options.slice(0, 2).map((o) => o.label.replace(/ \(\+\$[\d.]+\)$/, "").toLowerCase());
+    const opts2 = conflict.options.slice(0, 2).map((o) => { const l = o.label.replace(/ \(\+\$[\d.]+\)$/, ""); return l.charAt(0).toLowerCase() + l.slice(1); });
     const question = opts2.length ? ` Should I ${joinOr(opts2)}?` : "";
     const lead = parts.length ? `${first}, but ${conflict.message.charAt(0).toLowerCase()}${conflict.message.slice(1)}` : conflict.message;
     return `${lead}${question}`;
