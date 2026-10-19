@@ -28,7 +28,8 @@ const procs = [
 
 const env = { SIM_ADMIN: "1", ...process.env };
 const children = procs.map((p) => {
-  const child = spawn(npm, ["run", "dev", "-w", p.ws], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
+  // Own process group, so shutdown reaches npm's children too (and `node --watch` can't respawn the server).
+  const child = spawn(npm, ["run", "dev", "-w", p.ws], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
   const prefix = `\x1b[${p.color}m[${p.name}]\x1b[0m `;
   const pipe = (stream, out) => {
     let buf = "";
@@ -49,11 +50,26 @@ const children = procs.map((p) => {
 });
 
 let stopping = false;
+function killTree(child, signal) {
+  try {
+    if (process.platform === "win32") child.kill(signal);
+    else process.kill(-child.pid, signal);
+  } catch {
+    // already gone
+  }
+}
+
 function shutdown(code) {
   if (stopping) return;
   stopping = true;
-  for (const c of children) c.kill("SIGTERM");
-  setTimeout(() => process.exit(code), 300);
+  for (const c of children) killTree(c, "SIGTERM");
+  setTimeout(() => {
+    for (const c of children) killTree(c, "SIGKILL");
+    process.exit(code);
+  }, 1500);
 }
+process.on("exit", () => {
+  for (const c of children) killTree(c, "SIGKILL");
+});
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
