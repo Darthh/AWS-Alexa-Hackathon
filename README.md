@@ -17,6 +17,15 @@ Built for the **Alexa+ hackathon track**. Off-Peak combines the household's elec
 
 **[Open the live OffPeak demo →](https://offpeak.patrickvaldivia123.workers.dev)**
 
+## What Off-Peak can do for you
+
+- **Run the washer or dishwasher when power is cheapest.** Ask **“Alexa, run the washer when power is cheapest”** or **“Alexa, run the dishwasher when power is cheapest.”** Off-Peak proposes the lowest-cost feasible time within its planning window, respecting quiet hours, deadlines and household power limits.
+- **Charge the car before you need it.** Ask **“Charge the car to 80% by 7 AM.”** Off-Peak plans charging around cheaper electricity while meeting the target and deadline.
+- **Save energy when rooms are empty.** Say **“We're heading out until 9”** or **“It's just me in the office.”** Off-Peak reduces unnecessary power use while preserving protected devices and running cycles.
+- **Explain changes and show modeled savings.** Ask why a device turned off, undo that action, or see how much the simulated household saved.
+
+For an appliance request, review the proposed schedule, then say **“Alexa, do it”** or click **Approve this plan**. Each request plans one cycle; recurring “always run at the cheapest time” automation is not yet implemented. The public demo uses simulated appliances and clearly labeled synthetic electricity rates.
+
 **Status: hackathon prototype with a public demo and an offline local demo.** The AWS-inspired energy console preserves the simulator, deterministic planner, all 17 MCP tools, voice/screen controls, room occupancy, simulated clock, ledger, and traffic inspector. The public demo runs on Cloudflare Workers with a separate simulated household per visitor. Alexa+ is simulated here; the repository is not connected to an Echo device or the Alexa developer console. The optional AWS CDK deployment and real-device operation still require account-specific setup. See [current boundaries](#current-boundaries).
 
 ## Why Off-Peak exists
