@@ -54,6 +54,18 @@ The planner and money calculations are deterministic TypeScript. A language mode
 
 ## See it in action
 
+### Judge walkthrough
+
+Click **Start guided demo** in the [live console](https://offpeak.patrickvaldivia123.workers.dev). The seven scenes walk through proposing, approving, leaving, explaining, undoing, overnight results and office-only mode. Starting resets only this browser's disposable demo household. All original controls remain available.
+
+**Your plan, in dollars** shows the actual planner's run-now task cost, proposed cost and modeled difference with its server-computed rule checks. **Approve this plan** explicitly schedules it. The server rejects unresolved conflicts, superseded proposals, stale start times, and changes to household rules or tariffs.
+
+Use **Large screen** for an Echo Show presentation view and Escape to exit. **Download demo receipt** exports observed protocol operations, labeled costs, rule checks and protected-device state without raw RPC payloads or conversation captions. `npm run verify:submission` performs an independent live protocol/tool check and saves a local JSON report.
+
+The [hackathon readiness checklist](docs/hackathon-readiness.md) maps this work to the [official rules](https://amazonappdev2026.devpost.com/rules). The deadline is **Friday, October 23, 2026 at noon PDT**. [SUBMISSION.md](SUBMISSION.md) contains prepared entry text. A public video URL, team declarations and final Devpost submission remain.
+
+The additional MIT [tou-rates repository](https://github.com/Darthh/tou-rates) is public, with 21 standalone tests and an independent build. No npm registry release is claimed. The public Cloudflare demo does not establish live AWS-service use.
+
 ![OffPeak's AWS-inspired energy console: navigation, household metrics, Alexa+ appliance plan with $7.74 in synthetic savings, room occupancy, simulated clock, and activity ledger](docs/screenshots/01-plan.png)
 
 *Captured from the live Workers deployment in mock LLM mode. The light console uses AWS-style navigation, panels, and orange primary actions. The embedded timeline is the real MCP App, the browser connects to 17 MCP tools, and electricity rates and savings are explicitly synthetic.*
@@ -560,7 +572,7 @@ Thermostat setback and water-heater savings are modeled estimates. They are repo
 
 ### `tou-rates`: reusable tariff logic
 
-[`packages/tou-rates`](packages/tou-rates) provides OpenEI fetching, normalization, month/hour schedules, price lookup, transitions, day descriptions, and price slots. It has its own [README](packages/tou-rates/README.md) and [MIT license](packages/tou-rates/LICENSE), plus a standalone export script. This README does not claim a separate npm release or public package repository exists.
+[`packages/tou-rates`](packages/tou-rates) provides OpenEI fetching, normalization, month/hour schedules, price lookup, transitions, day descriptions, and price slots. It has its own [README](packages/tou-rates/README.md) and [MIT license](packages/tou-rates/LICENSE), plus a standalone export script. The standalone MIT repository is public at https://github.com/Darthh/tou-rates; no npm registry release is claimed.
 
 For example, from code inside this workspace:
 
@@ -588,7 +600,7 @@ npm test
 npm run build
 ```
 
-The default output is `out/tou-rates`; an explicit output directory may be passed to the exporter. It copies sources, fixtures, the README, and the license, and rewrites package metadata for built ESM/declaration output. Use a dedicated generated-output directory: rerunning the exporter replaces its exported `src` directory. Publishing that result is a separate action.
+The default output is `out/tou-rates`; the exporter constrains output to that dedicated generated workspace. It copies sources, fixtures, the README, and the license, and rewrites package metadata for built ESM/declaration output. Use a dedicated generated-output directory: rerunning the exporter replaces its exported `src` directory. The tested standalone project is published at https://github.com/Darthh/tou-rates; future changes can be exported and pushed separately.
 
 ## Development and testing
 
@@ -606,6 +618,8 @@ The default output is `out/tou-rates`; an explicit output directory may be passe
 | `npm run dev:worker` | Run the complete Workers deployment locally on port 8790 |
 | `npm run deploy` | Build and deploy to the configured Cloudflare account and free subdomain |
 | `npm run test:e2e` | Run browser checks against the local Workers stack (installed Google Chrome required) |
+| `npm run verify:submission` | Check required documents and a live MCP handshake, discovery and price call |
+| `npm run record:demo` | Capture the actual guided walkthrough as an English-captioned WebM |
 | `npm run build:lambda` | Bundle server/executor and copy runtime assets for CDK |
 | `npm run cdk:synth` | Install infra dependencies and synthesize CloudFormation; no deployment |
 | `npm run inspector` | Start the pinned MCP Inspector |
@@ -625,7 +639,7 @@ The default output is `out/tou-rates`; an explicit output directory may be passe
 - Browser checks for all console controls, eight demo prompts, embedded/native screens, mock/scripted routing, typed messages, clock controls, occupancy, visitor isolation, refresh persistence, cross-origin rejection, and responsive navigation. Set `E2E_BASE_URL` to the deployed URL to run the same checks live; `UPDATE_SCREENSHOTS=1` refreshes the four README images from that run.
 - The complete default planning/execution scenario, including its exact fixture costs.
 
-**Console verification on October 19, 2026:** all **123 tests across 11 test files**, workspace/Worker type checks, and the production Workers build passed. All **four browser scenarios** passed locally and against the deployed URL, including the full evening, every console control, fallbacks, visitor isolation, and responsive navigation. The four images above come from that live browser run.
+**Console verification on October 19, 2026:** all **128 tests across 12 test files**, workspace/Worker type checks, and the production Workers build passed. All **six browser scenarios** passed locally and against the deployed URL, including the guided walkthrough, downloadable evidence, explicit approval, stale-plan recovery, full evening, fallbacks, visitor isolation, and responsive navigation. The four images above come from that live browser run.
 
 Earlier infrastructure checks recorded for this repository include successful Lambda packaging, local CDK synthesis, and a standalone `tou-rates` export with **21 tests** and a successful build. Those checks are separate from this UI/Workers release and do not establish live AWS or device operation.
 
@@ -665,7 +679,7 @@ AWS-Alexa-Hackathon/
 
 For intent and constraints, read [SPEC.md](SPEC.md). For what changed during implementation, use [DECISIONS.md](DECISIONS.md). For compatibility issues and workarounds, see [FRICTION_LOG.md](FRICTION_LOG.md). Planned files or infrastructure mentioned in the specification are not necessarily implemented; the source tree and this README describe the current project.
 
-For the presentation, see [DEMO_SCRIPT.md](DEMO_SCRIPT.md) and [SUBMISSION.md](SUBMISSION.md). The submission remains a draft with items such as the actual video, team handles, chosen Bedrock model, and standalone library URL to complete. [FEEDBACK.md](FEEDBACK.md) and [FEATURE_REQUESTS.md](FEATURE_REQUESTS.md) collect hackathon developer feedback and requests.
+For the presentation, see [DEMO_SCRIPT.md](DEMO_SCRIPT.md) and [SUBMISSION.md](SUBMISSION.md). The submission now includes the public library URL and verified contributor. A public video URL, team declarations and final Devpost submission remain. AWS/model claims require actual live validation. [FEEDBACK.md](FEEDBACK.md) and [FEATURE_REQUESTS.md](FEATURE_REQUESTS.md) collect hackathon developer feedback and requests.
 
 ## Security and privacy
 
@@ -709,7 +723,7 @@ This is a **development prototype**, not a hardened public smart-home service. T
 | Home Assistant | Optional mapped actions; no full live state synchronization or phone geofencing. |
 | Billing | Time-of-use energy model and labeled estimates; no claim of whole-bill accuracy or guaranteed savings. |
 | Reliability at scale | Workers serializes each visitor's demo in a Durable Object with persisted state. Node/JSON targets one process. Authenticated accounts, service quotas, and production operational controls need further work. |
-| Publishing | `tou-rates` includes standalone export tooling; a separate public release is not asserted here. |
+| Publishing | The MIT [tou-rates source repository](https://github.com/Darthh/tou-rates) is public; no npm registry release is claimed. |
 
 [BACKLOG.md](BACKLOG.md) tracks deferred work, including higher billing tiers, demand charges, solar/export accounting, thermal modeling, learned behavior, multi-household authentication, a mobile app, and geofencing.
 
@@ -734,3 +748,5 @@ Use [GitHub issues](https://github.com/Darthh/AWS-Alexa-Hackathon/issues) for bu
 ## License
 
 Released under the **[MIT License](LICENSE)**. Copyright © 2026 Darthh. Third-party services and dependencies retain their own terms and licenses.
+
+Public Sans is self-hosted under the SIL Open Font License; its license is preserved in `packages/web/public/fonts/OFL.txt`.

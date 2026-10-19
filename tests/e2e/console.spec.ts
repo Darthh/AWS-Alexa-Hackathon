@@ -113,7 +113,7 @@ test("the full evening still plans, applies, explains, undoes and saves", async 
     .toBeGreaterThan(0);
   await page.getByRole("button", { name: "→ 6:45 PM", exact: true }).click();
   await ask(page, "We're heading out until 9.");
-  await expect(page.locator(".mode-chip")).toContainText("away");
+  await expect(page.locator(".house .mode-chip")).toContainText("away");
   if (shotDir) {
     await page.evaluate(() => scrollTo(0, 0));
     await page.screenshot({ path: `${shotDir}/02-away.png`, fullPage: true });
@@ -128,7 +128,7 @@ test("the full evening still plans, applies, explains, undoes and saves", async 
     .filter({ has: page.getByText("TV", { exact: true }) });
   await expect(tv).toHaveClass(/\bon\b/);
   await ask(page, "It's just me in the office.");
-  await expect(page.locator(".mode-chip")).toContainText("only");
+  await expect(page.locator(".house .mode-chip")).toContainText("only");
   await ask(page, "What's the price right now?");
   for (const jump of ["→ 9 PM", "→ Midnight", "→ 7 AM"])
     await page.getByRole("button", { name: jump, exact: true }).click();

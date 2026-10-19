@@ -45,6 +45,10 @@ One line per decision, newest at the bottom of each section.
 - 2026-10-19 · The MCP App is hosted with ext-apps' `AppBridge` in a `sandbox="allow-scripts"` srcdoc iframe; on any failure within 4 s the web client renders the same view natively from `structuredContent` (shared renderer in `packages/ui-apps/src/timeline.ts`).
 
 ## Console and public demo
+- 2026-10-19 · Extend the existing AWS-style console with a guided seven-scene walkthrough, explicit approval, labeled task-cost comparison, visible household rules, a readable presentation view, and downloadable observations. Keep all 17 tools and original controls.
+- 2026-10-19 · A proposed plan must still match its approval context: reject unresolved conflicts, superseded proposals, changed rules/tariffs, and starts over one minute in the past. Applied plans remain idempotent.
+- 2026-10-19 · Publish the independently tested MIT tariff library at `Darthh/tou-rates`. The optional new CI workflow was omitted because the existing OAuth login lacks workflow scope; the parent CI validates the export.
+- 2026-10-19 · Self-host Public Sans with its OFL license and record real browser actions with English captions. Separate the public MCP/Cloudflare demo from unverified live AWS/Echo operation and the team's remaining Devpost/video declarations.
 - 2026-10-19 · Use the AWS console as the UI reference while retaining React/Vite, every existing control, the conversation loop, and the shared MCP App/native renderer.
 - 2026-10-19 · Host the no-key demo on `offpeak.patrickvaldivia123.workers.dev`. Reuse the Express/MCP server via the Workers Node HTTP adapter; isolate and persist each browser's simulated household in a SQLite Durable Object. Keep the original Node/AWS integrations intact.
 - 2026-10-19 · The Worker build embeds fixtures and screen HTML and always uses same-origin APIs. It never reads AWS/model/device credentials from local deployment configuration. Browser tests and live screenshots cover the public demo; AWS/Echo operation remains a separate boundary.

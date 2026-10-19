@@ -1,4 +1,10 @@
-@import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;450;500;550;600;650;700;750;800&display=swap");
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/public-sans-variable.ttf") format("truetype");
+}
 :root {
   --bg: #f2f3f3;
   --panel: #fff;
@@ -1333,5 +1339,327 @@ input[type="checkbox"] {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Reviewable demo scenes and the evidence behind each decision. */
+.demo-guide {
+  margin-bottom: 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 17px;
+  padding: 19px 20px 0;
+}
+.guide-main {
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+}
+.guide-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 40px;
+  background: #fff5e7;
+  color: #b96708;
+  border: 1px solid #f1d4ad;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.guide-eyebrow {
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: 1px;
+  color: #7c8b99;
+  margin-bottom: 4px;
+}
+.guide-main h2 {
+  margin: 0 0 5px;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.3px;
+}
+.guide-main p {
+  margin: 0;
+  font-size: 10px;
+  color: #687b8c;
+  max-width: 670px;
+  line-height: 1.8;
+}
+.guide-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.guide-progress {
+  grid-column: 1/-1;
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.guide-progress > span {
+  font-size: 10px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: #8996a2;
+  padding: 3px 5px;
+  border-bottom: 2px solid #e3e9ef;
+}
+.guide-progress > span.done {
+  color: #16815f;
+  border-color: #86c3a5;
+}
+.guide-progress > span.current {
+  color: #0967b9;
+  border-color: #0972d3;
+}
+.guide-evidence {
+  grid-column: 1/-1;
+  border-top: 1px solid #e7eaec;
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  padding: 10px 0;
+  font-size: 9px;
+  color: #728291;
+  flex-wrap: wrap;
+}
+.guide-evidence > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.guide-evidence .verified {
+  color: #16815f;
+}
+.guide-evidence .pending {
+  color: #8996a2;
+}
+.guide-evidence button {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #0967b9;
+  font-size: 10px;
+  padding: 0;
+}
+.guide-error {
+  grid-column: 1/-1;
+  color: #b12020;
+  font-size: 12px;
+  margin: 0;
+}
+.plan-costs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 17px 20px 12px;
+}
+.plan-costs > div {
+  border-right: 1px solid #e3e9ef;
+}
+.plan-costs > div:last-child {
+  border: 0;
+}
+.plan-costs span {
+  display: block;
+  font-size: 10px;
+  color: #6c7a88;
+}
+.plan-costs strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 25px;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+.cost-saving {
+  color: #16815f;
+}
+.cost-scope {
+  padding: 0 20px;
+  color: #7a8794;
+  font-size: 9px;
+  margin: 0 0 15px;
+  line-height: 1.7;
+}
+.plan-checks {
+  list-style: none;
+  padding: 13px 20px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #f8fbf9;
+  border-top: 1px solid #e7eaec;
+}
+.plan-checks li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 11px;
+}
+.plan-checks li svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.plan-checks .ok {
+  color: #247452;
+}
+.plan-checks .bad {
+  color: #b12020;
+}
+.plan-conflict {
+  margin: 12px 20px;
+  font-size: 11px;
+  color: #9e4b12;
+}
+.plan-conflict ul {
+  padding-left: 18px;
+}
+.plan-approval {
+  padding: 14px 20px;
+  border-top: 1px solid #e7eaec;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.plan-approval > span {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 10px;
+  color: #667c8e;
+}
+.plan-approval p {
+  font-size: 11px;
+  color: #9e4b12;
+  margin: 0;
+}
+#household {
+  display: flex;
+  flex-direction: column;
+  gap: 21px;
+}
+.household-rules ul {
+  list-style: none;
+  padding: 16px 18px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.household-rules li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: #52687d;
+  font-size: 11px;
+}
+.household-rules li svg {
+  flex-shrink: 0;
+  color: #748c9f;
+  margin-top: 2px;
+}
+.household-rules > p {
+  padding: 12px 18px;
+  border-top: 1px solid #e7eaec;
+  background: #fcfcfd;
+  color: #7a8794;
+  font-size: 9px;
+  margin: 0;
+}
+.receipt-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 23px 0;
+  font-size: 10px;
+  color: #7a8794;
+}
+.simulator-panel.presenting {
+  position: fixed;
+  inset: 12px;
+  z-index: 20;
+  overflow: auto;
+  box-shadow: 0 0 0 50px #232f3e90;
+}
+.presenting .screen,
+.presenting .dot-wrap {
+  height: 63vh;
+  min-height: 400px;
+}
+.presenting .screen .op-view {
+  font-size: 24px;
+}
+.presenting .screen-status {
+  font-size: 14px;
+}
+.presenting .captions .cap {
+  font-size: 20px;
+}
+.presenting .quick-actions {
+  display: none;
+}
+.presenting .ask input {
+  font-size: 16px;
+}
+@media (max-width: 1000px) {
+  .demo-guide {
+    grid-template-columns: 1fr;
+  }
+  .guide-actions {
+    justify-content: flex-start;
+  }
+}
+@media (max-width: 500px) {
+  .demo-guide {
+    padding: 15px 13px 0;
+    gap: 12px;
+  }
+  .guide-main {
+    gap: 9px;
+  }
+  .guide-icon {
+    display: none;
+  }
+  .guide-main h2 {
+    font-size: 14px;
+  }
+  .guide-evidence {
+    gap: 9px;
+    font-size: 8px;
+  }
+  .guide-evidence button {
+    margin-left: 0;
+  }
+  .guide-progress > span > span {
+    display: none;
+  }
+  .plan-costs {
+    padding-inline: 14px;
+    gap: 8px;
+  }
+  .plan-costs span {
+    font-size: 9px;
+  }
+  .plan-costs strong {
+    font-size: 23px;
+  }
+  .receipt-toolbar {
+    padding: 12px 14px 0;
+    flex-wrap: wrap;
+  }
+  .presenting .screen {
+    min-height: 350px;
   }
 }

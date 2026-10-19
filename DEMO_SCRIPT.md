@@ -1,8 +1,16 @@
 # Demo video script (target 2:50)
 
+**Reproducible capture:** Run `npm run record:demo` to record the actual deployed seven-scene walkthrough as `out/offpeak-demo.webm` with English explanatory captions. The capture uses mock conversation, real MCP calls and synthetic rates. It adds no stock footage or music and does not upload anything. Set `DEMO_URL` to a local deployment for offline capture; Google Chrome and Playwright's local FFmpeg helper are required.
+
+Convert the saved WebM to MP4 with FFmpeg if desired. Inspect the recording and verify it is below 180 seconds, then upload it to **public YouTube or Vimeo** and paste that URL into Devpost. A local video or GitHub file URL does not satisfy that field.
+
+**Actual public mode:** Mock LLM on Cloudflare. Live Bedrock and real Echo operation are not claimed. Click **Start guided demo** to inspect each scene before continuing. **Large screen** expands the simulator; Escape exits. **Download demo receipt** exports labeled runtime evidence.
+
+**Captured October 19:** `out/offpeak-demo.mp4` is an actual 1600×1000 H.264 capture, **113.04 seconds** long (under three minutes), with English on-screen captions. It contains no audio/music track. The scene metadata and original WebM are retained under `out/`; generated video is not committed to the source repository.
+
 **Setup:** `npm run dev`, open http://localhost:5173 at 1440×1000 or larger, and click **Reset** on the sim clock (5:30 PM Monday, demo rate).
 
-- **Primary brain:** Bedrock (`LLM_MODE=bedrock`, `BEDROCK_MODEL_ID` set).
+- **Primary public brain:** Mock LLM. Bedrock remains optional and requires validation with an existing account and approved budget.
 - **Backup:** open **http://localhost:5173/?mode=scripted**. Say so honestly in the submission if you use it.
 - **Recording tips:**
   - Keep the MCP Inspector tab visible for scene 1 (switch the right-bottom tab).
@@ -18,8 +26,8 @@
 | 1:40–2:00 | **Trust** | Say: "Why did the TV turn off?" | "The TV turned off at 6:45 PM because you left home and it was drawing 15 W on standby. Say undo to reverse it." |
 | | | Say: "Turn it back on." | "Done, the TV is back the way it was." The TV is lit again; the ledger row is struck through. |
 | 2:00–2:20 | **7 AM: results** | Press **→ 7 AM**. Show the car at **80%** in the garage and the ledger filled in (dryer 9 PM, car and dishwasher at midnight, restore at 9 PM). Say: "How much did Off-Peak save me today?" | Savings screen: **$7.20** today (car and dishwasher since midnight), split by source, with top wins. |
-| 2:20–2:35 | **Next evening: one room** | Press **→ 5:30 PM**. Say: "It's just me in the office." Then click **Echo Show** in the top bar to switch to **Voice-only (Echo Dot)**. | Living room, kitchen, and bedroom go dark; the office stays on; the whole-home thermostat isn't touched. Echo Dot ring + captions only: "Okay, just the office: I turned off 7 things in the other rooms, but the fridge stays on." |
-| 2:35–2:50 | **Close** | Cut to the README architecture diagram and the AWS services table. Voice-over: "Rules, then presence, then price." | End on the savings number. |
+| 2:20–2:35 | **Next evening: one room** | Press **→ 5:30 PM**. Say: "It's just me in the office." Then click **Echo Show** in the simulator toolbar to switch to **Voice-only (Echo Dot)**. | Living room, kitchen, and bedroom go dark; the office stays on; the whole-home thermostat isn't touched. Echo Dot ring + captions only: "Okay, just the office: I turned off 7 things in the other rooms, but the fridge stays on." |
+| 2:35–2:50 | **Close** | Show the protocol Inspector and public MIT tariff library. Describe AWS adapters as optional and offline-tested unless live validation has been completed. Voice-over: "Rules, then presence, then price." | End on the savings number. |
 
 **Extras if time allows:**
 - "When's the cheapest time to run the dishwasher?"

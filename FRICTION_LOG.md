@@ -104,3 +104,49 @@ Issues we hit with SDKs, docs, and tools while building Off-Peak, logged as they
 - Severity: minor
 - Workaround: None needed; documented in the README.
 - Suggestion: Let clients skip the standalone GET when the server signals statelessness (e.g. no `mcp-session-id`), or an option to disable it.
+
+
+### Windows npm.cmd process creation fails with EINVAL
+- Task attempted: Run the one-command local demo on Windows with Node 24.
+- Steps taken: Reproduced `spawnSync("npm.cmd", ["--version"])`; started the original process model and inspected the launcher.
+- Expected: npm reports a version and child workspace commands start.
+- Actual: Direct process creation returns EINVAL. The corrected `npm run dev` starts both Vite on 5173 and the MCP server on 8787.
+- Severity: major
+- Workaround: Invoke `process.execPath` with `process.env.npm_execpath` and workspace arguments. Stop only the spawned process tree on Windows.
+- Suggestion: Cross-platform examples should use the npm JS entry point rather than assuming .cmd launch behavior matches a POSIX executable.
+
+### File URL pathname is not a native Windows path
+- Task attempted: Export tou-rates as an independent repository.
+- Steps taken: Inspected `new URL("..", import.meta.url).pathname` in the existing export script and compared it with `fileURLToPath`.
+- Expected: The repository root resolves correctly on Windows and Linux.
+- Actual: URL pathnames include a leading slash before a Windows drive letter. The corrected export installed, passed 21 tests and built independently on Windows.
+- Severity: major
+- Workaround: Convert the file URL with `fileURLToPath`; constrain generated output to the dedicated export workspace.
+- Suggestion: Node examples that derive paths from import.meta.url should demonstrate the URL conversion API explicitly.
+
+### Lambda packaging duplicated the Windows drive letter
+- Task attempted: Build the optional AWS Lambda deployment artifacts on Windows.
+- Steps taken: Ran `npm run build:lambda`; Vite bundled the server/executor, then the asset-copy script ran.
+- Expected: Fixtures and the MCP App are packaged beside the Lambda entry points.
+- Actual: The copy script tried to read `C:\C:\Users\...\fixtures` and failed with ENOENT.
+- Severity: major
+- Workaround: Convert both file URLs with `fileURLToPath`. The corrected packager copied fixtures, the screen and run.sh; CDK synthesis also passed locally.
+- Suggestion: Packaging examples should test file-URL conversion on Windows in addition to POSIX hosts.
+
+### GitHub OAuth lacks workflow write scope
+- Task attempted: Publish the independently tested MIT tariff library with an optional new CI workflow.
+- Steps taken: Created the public repository and pushed the initial commit.
+- Expected: The source, license and workflow are accepted together.
+- Actual: GitHub rejected the workflow file because the current OAuth app lacks workflow scope.
+- Severity: minor
+- Workaround: Removed the optional workflow before the first successful push. OffPeak's existing CI tests the exported library; no account permission expansion was needed.
+- Suggestion: CLI repository creation could report workflow-scope readiness before attempting a source push.
+
+### Hosted demo inherited a localhost API override
+- Task attempted: Build the hosted console from a normal developer environment.
+- Steps taken: Built with VITE_MCP_URL=http://localhost:8787/mcp, then checked the generated Worker web bundle.
+- Expected: A Workers deployment uses its own /mcp and companion routes.
+- Actual: Normal Vite environment replacement can retain a local override. Explicit Worker build mode now omits that override; the bundled client resolves its current origin.
+- Severity: major
+- Workaround: A dedicated Vite worker mode and a build check; live browser tests use the deployed same-origin endpoint.
+- Suggestion: Deployment templates should separate development endpoint overrides from hosted defaults.

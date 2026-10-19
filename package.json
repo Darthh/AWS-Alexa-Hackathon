@@ -29,7 +29,9 @@
     "deploy": "npm run build:worker && wrangler deploy",
     "dev:worker": "npm run build:worker && wrangler dev --port 8790",
     "typecheck:worker": "tsc -p worker/tsconfig.json",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "verify:submission": "node scripts/verify-submission.mjs",
+    "record:demo": "node scripts/record-demo.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261019.1",

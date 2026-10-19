@@ -2,7 +2,7 @@
 
 For every tool and SDK we used: what we used it for, what worked, what needs work, the onboarding experience, and whether we'd build with it again. Concrete step-by-step issues are in [FRICTION_LOG.md](FRICTION_LOG.md).
 
-> **TODO(team):** add Bedrock / Lambda / DynamoDB / EventBridge Scheduler / Polly notes after deploying to a real account. During the build there were no AWS credentials, so those sections describe implementation and offline validation only.
+> **Validation boundary:** AWS sections describe implemented integrations and offline validation with injected clients. No live AWS-service test is claimed. Cloudflare, the public MCP endpoint, and browser flows have been exercised live.
 
 ## MCP TypeScript SDK (`@modelcontextprotocol/sdk` 1.32.1)
 - **Used for:** The MCP server (`McpServer.registerTool` / `registerResource`, `StreamableHTTPServerTransport` in stateless JSON mode) and the browser MCP client in the simulator (`Client` + `StreamableHTTPClientTransport`).
@@ -40,7 +40,7 @@ For every tool and SDK we used: what we used it for, what worked, what needs wor
   - In the documented host flow (set the src, then connect), a fast View's `ui/initialize` is lost.
   - `setHostContext()` before `connect()` throws.
   - The View bundle is 460 KB for a tiny UI.
-- **Onboarding:** The typed examples (`*.examples.ts`) are excellent; the hosting race cost us about an hour.
+- **Onboarding:** The typed examples (`*.examples.ts`) are excellent; the host must attach its bridge before loading the View.
 - **Would we use it again?** Yes. It's the right abstraction for Echo Show-class screens.
 
 ## OpenEI Utility Rate Database (URDB API)
@@ -82,3 +82,39 @@ For every tool and SDK we used: what we used it for, what worked, what needs wor
 
 ## Kiro
 - Not used for this build.
+
+
+## Cloudflare Workers, SQLite Durable Objects and Wrangler
+- **Used for:** The public console and the unchanged Express/MCP server through the Node HTTP adapter. Each browser gets an isolated persisted demo household.
+- **What worked:** The static asset binding and `handleAsNodeRequest` support the real browser MCP client, SSE snapshots, clock controls and the shared screen. The deployed walkthrough and isolation tests pass.
+- **Needs work:** Bundled CommonJS dependencies need a `createRequire` shim. Worker `import.meta.url` cannot be assumed to be a filesystem URL. Repository fixture reads must be replaced at build time or injected.
+- **Onboarding:** Existing Wrangler OAuth authentication worked without account changes. A dry run exposed Node compatibility errors before deployment. The free SQLite migration was explicit.
+- **Would we use it again?** Yes, for this isolated, no-key demonstration. It does not replace AWS validation.
+
+## React, Vite, TypeScript, Node.js, Zod and Luxon
+- **Used for:** The console, builds, strict types, native server execution, tool schemas and timezone-aware domain math.
+- **What worked:** Shared typed tool results work in the embedded and native screens; Zod keeps malformed inputs out of the domain; Luxon supports the DST tests. Production assets can be served on the same origin.
+- **Needs work:** A root development `.env` can accidentally bake localhost into a hosted UI. Spawning `npm.cmd` directly fails with EINVAL on the tested Windows/Node setup.
+- **Onboarding:** Workspace setup was straightforward; the launcher now invokes npm's JS entry point through Node. Worker build mode explicitly uses same-origin APIs.
+- **Would we use them again?** Yes. Keep pricing and constraint logic outside UI/model code.
+
+## Vitest and Playwright
+- **Used for:** 128 core/server tests, 21 standalone library tests, six browser scenarios, live screenshots and a reproducible product capture.
+- **What worked:** The browser suite exercises the real SDK/HTTP paths, including proposal approval, away/explain/undo, overnight execution, fallbacks, visitor isolation and exported evidence.
+- **Needs work:** Controlled occupancy checkboxes update after the server snapshot; tests must wait for the state rather than require an immediate synchronous change. External font requests can stall screenshot readiness.
+- **Onboarding:** Installed Chrome works with the existing test runner. The console font is now self-hosted with its OFL license, keeping text demos independent of Google Fonts availability.
+- **Would we use them again?** Yes. Unit tests verify invariants; browser tests verify the product flow.
+
+## REA
+- **Used for:** Static inspection of the UI source tree during the console redesign.
+- **What worked:** The source analyzer parsed the ten UI files with zero parse failures in the recorded redesign check.
+- **Needs work:** Source-reference import reports unavailable safe no-follow file opens on Windows; analysis of the minified bundle exhausted the analysis worker heap.
+- **Onboarding:** CLI help made it possible to use a bounded source analysis instead. Static results were kept separate from browser evidence.
+- **Would we use it again?** Yes for source investigation, alongside runtime checks.
+
+## Amazon Polly SDK
+- **Used for:** Optional server-side speech synthesis with browser speech as fallback.
+- **What worked (offline):** The route keeps voice configuration server-side, bounds text length, and can return audio without changing the browser conversation loop.
+- **Needs work:** Voice availability, service permission and audio output still need live account validation.
+- **Onboarding:** SDK integration only; no live synthesis invocation is asserted.
+- **Would we use it again?** Evaluate after live validation; the free demo uses browser speech.

@@ -11,9 +11,14 @@ It has one runtime dependency (Luxon) and no I/O beyond an injectable `fetch`. I
 
 ## Install
 
+This project is published as an MIT-licensed [GitHub repository](https://github.com/Darthh/tou-rates), not as a release on the npm registry. Requires Node.js 22.18 or newer.
+
 ```bash
-npm install tou-rates
+# Install from the public source repository; prepare builds the ESM output.
+npm install git+https://github.com/Darthh/tou-rates.git
 ```
+
+Or clone the standalone project and run `npm ci && npm test && npm run build`.
 
 ## Use
 

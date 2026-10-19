@@ -5,7 +5,11 @@ import { toolText, type McpConn } from "./mcp.ts";
 export interface ConverseBlock {
   text?: string;
   toolUse?: { toolUseId: string; name: string; input: Record<string, unknown> };
-  toolResult?: { toolUseId: string; content: ({ text: string } | { json: unknown })[]; status?: "success" | "error" };
+  toolResult?: {
+    toolUseId: string;
+    content: ({ text: string } | { json: unknown })[];
+    status?: "success" | "error";
+  };
 }
 
 export interface ConverseMessage {
@@ -32,8 +36,17 @@ const MAX_HISTORY = 24;
 /** MCP tools → Bedrock Converse toolSpec (JSON Schema in inputSchema.json). */
 export function toolSpecs(tools: Tool[]) {
   return tools.map((t) => {
-    const { $schema: _ignored, ...schema } = t.inputSchema as Record<string, unknown>;
-    return { toolSpec: { name: t.name, description: t.description ?? t.name, inputSchema: { json: schema } } };
+    const { $schema: _ignored, ...schema } = t.inputSchema as Record<
+      string,
+      unknown
+    >;
+    return {
+      toolSpec: {
+        name: t.name,
+        description: t.description ?? t.name,
+        inputSchema: { json: schema },
+      },
+    };
   });
 }
 
@@ -55,17 +68,25 @@ export class Conversation {
   readonly #serverBase: string;
   readonly #onTool: (e: ToolEvent) => void;
 
-  constructor(conn: McpConn, serverBase: string, onTool: (e: ToolEvent) => void) {
+  constructor(
+    conn: McpConn,
+    serverBase: string,
+    onTool: (e: ToolEvent) => void,
+  ) {
     this.#conn = conn;
     this.#serverBase = serverBase;
     this.#onTool = onTool;
   }
 
-  async #call(name: string, args: Record<string, unknown>): Promise<CallToolResult> {
+  async #call(
+    name: string,
+    args: Record<string, unknown>,
+  ): Promise<CallToolResult> {
     const result = await this.#conn.callTool(name, args);
     const s = result.structuredContent as Record<string, any> | undefined;
     if (name === "explain" && s?.entry?.id) this.ctx.lastEntryId = s.entry.id;
-    if (name === "find_rate_plans" && Array.isArray(s?.plans)) this.ctx.ratePlans = s.plans;
+    if (name === "find_rate_plans" && Array.isArray(s?.plans))
+      this.ctx.ratePlans = s.plans;
     this.#onTool({ name, args, result });
     return result;
   }
@@ -73,15 +94,27 @@ export class Conversation {
   async askScripted(text: string): Promise<TurnResult> {
     const intent = routeUtterance(text, this.ctx);
     let reply = intent.fallback ?? "";
-    for (const c of intent.calls) reply = toolText(await this.#call(c.tool, c.args));
-    return { reply, toolCalls: intent.calls.length, brain: "scripted" };
+    let error = false;
+    for (const c of intent.calls) {
+      const result = await this.#call(c.tool, c.args);
+      reply = toolText(result);
+      error ||= Boolean(result.isError);
+    }
+    return { reply, toolCalls: intent.calls.length, brain: "scripted", error };
   }
 
   #trim(): void {
     if (this.messages.length <= MAX_HISTORY) return;
     let start = this.messages.length - MAX_HISTORY;
     // Never start on a dangling toolResult/toolUse: begin at a plain user utterance.
-    while (start < this.messages.length && !(this.messages[start]!.role === "user" && this.messages[start]!.content.some((b) => b.text !== undefined))) start++;
+    while (
+      start < this.messages.length &&
+      !(
+        this.messages[start]!.role === "user" &&
+        this.messages[start]!.content.some((b) => b.text !== undefined)
+      )
+    )
+      start++;
     this.messages = this.messages.slice(start);
   }
 
@@ -96,10 +129,22 @@ export class Conversation {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ messages: this.messages, tools }),
       });
-      const body = (await res.json()) as { output?: { message: ConverseMessage }; stopReason?: string; mode?: string; speakable?: string };
+      const body = (await res.json()) as {
+        output?: { message: ConverseMessage };
+        stopReason?: string;
+        mode?: string;
+        speakable?: string;
+      };
       if (!res.ok || !body.output) {
         this.messages.pop();
-        return { reply: body.speakable ?? "Sorry, I couldn't reach my brain. Try scripted mode.", toolCalls: calls, brain, error: true };
+        return {
+          reply:
+            body.speakable ??
+            "Sorry, I couldn't reach my brain. Try scripted mode.",
+          toolCalls: calls,
+          brain,
+          error: true,
+        };
       }
       brain = body.mode === "bedrock" ? "bedrock" : "mock";
       const msg = body.output.message;
@@ -107,13 +152,22 @@ export class Conversation {
       const uses = msg.content.filter((b) => b.toolUse).map((b) => b.toolUse!);
       if (!uses.length || body.stopReason !== "tool_use") {
         this.#trim();
-        const reply = msg.content.map((b) => b.text ?? "").join(" ").trim();
+        const reply = msg.content
+          .map((b) => b.text ?? "")
+          .join(" ")
+          .trim();
         return { reply: reply || "Okay.", toolCalls: calls, brain };
       }
       const results: ConverseBlock[] = [];
       for (const u of uses) {
         if (calls >= MAX_TOOL_CALLS) {
-          results.push({ toolResult: { toolUseId: u.toolUseId, content: [{ text: "Tool call limit reached for this turn." }], status: "error" } });
+          results.push({
+            toolResult: {
+              toolUseId: u.toolUseId,
+              content: [{ text: "Tool call limit reached for this turn." }],
+              status: "error",
+            },
+          });
           continue;
         }
         calls++;
@@ -122,16 +176,32 @@ export class Conversation {
           results.push({
             toolResult: {
               toolUseId: u.toolUseId,
-              content: [{ text: toolText(r) }, ...(r.structuredContent ? [{ json: forModel(r.structuredContent) }] : [])],
+              content: [
+                { text: toolText(r) },
+                ...(r.structuredContent
+                  ? [{ json: forModel(r.structuredContent) }]
+                  : []),
+              ],
               status: r.isError ? "error" : "success",
             },
           });
         } catch (err) {
-          results.push({ toolResult: { toolUseId: u.toolUseId, content: [{ text: `Tool failed: ${(err as Error).message}` }], status: "error" } });
+          results.push({
+            toolResult: {
+              toolUseId: u.toolUseId,
+              content: [{ text: `Tool failed: ${(err as Error).message}` }],
+              status: "error",
+            },
+          });
         }
       }
       this.messages.push({ role: "user", content: results });
     }
-    return { reply: "Sorry, that took too many steps.", toolCalls: calls, brain, error: true };
+    return {
+      reply: "Sorry, that took too many steps.",
+      toolCalls: calls,
+      brain,
+      error: true,
+    };
   }
 }

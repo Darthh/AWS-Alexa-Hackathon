@@ -15,8 +15,8 @@ REA parsed 10 files (59,166 text bytes, 9,623 AST nodes) with zero parse failure
 ## Verification
 
 - Strict TypeScript checks for the five workspaces and the Worker entry point.
-- 123 existing Vitest tests pass, covering the deterministic planner, pricing, MCP, protection, undo, conversation, and adapters.
-- Four Playwright browser scenarios pass locally and against the public Workers URL: all console controls; the complete evening sequence; fallback/typed input/isolation/persistence; responsive navigation.
+- 128 Vitest tests pass, covering the deterministic planner, pricing, MCP, protection, undo, conversation, and adapters.
+- Six Playwright browser scenarios pass locally and against the public Workers URL: all console controls; the complete evening sequence; fallback/typed input/isolation/persistence; responsive navigation.
 - The evening still proposes $7.74 in synthetic savings, preserves protected devices, applies the plan, explains and undoes the TV action, and charges the EV to 80% by the following morning.
 - Screenshot files `01-plan.png`, `02-away.png`, `03-savings.png`, and `04-voice-only.png` are captured from the live deployment, in mock mode with the actual MCP App.
 
@@ -29,3 +29,5 @@ Live URL: <https://offpeak.patrickvaldivia123.workers.dev>.
 The Worker reuses the Express/MCP server through Cloudflare's Node HTTP adapter. A random browser cookie selects an isolated SQLite Durable Object; the existing store interface persists the demo state. A build-only fixtures adapter embeds the same household and tariff files, and the prebuilt MCP App is injected as a resource. Node filesystem loaders and optional AWS adapters remain available in the original server.
 
 The deployment uses Workers Free-compatible resources. No paid-plan upgrade, purchased domain, AWS resource, real-device integration, or model credential is required. Demos expire after inactivity; this is not an authenticated household service.
+
+The readiness pass adds a seven-scene guided walkthrough, task-cost/guardrail review, explicit approval, stale/conflict checks, downloadable evidence, Large screen, a self-hosted OFL font and a public standalone tariff library. See the hackathon readiness checklist.

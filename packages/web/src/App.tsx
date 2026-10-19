@@ -12,7 +12,15 @@ import {
 } from "./components/Screens.tsx";
 import { Conversation, type ToolEvent } from "./lib/converse.ts";
 import { getConnection, type McpConn, type RpcLog } from "./lib/mcp.ts";
-import { subscribe, type Snapshot } from "./lib/sim.ts";
+import { sim, subscribe, type Snapshot } from "./lib/sim.ts";
+import {
+  DemoGuide,
+  HouseholdRules,
+  PlanReview,
+  TOUR,
+  downloadReceipt,
+} from "./components/JudgePanels.tsx";
+import { toolText } from "./lib/mcp.ts";
 import {
   createListener,
   speak,
@@ -78,6 +86,10 @@ export function App() {
   const [text, setText] = useState("");
   const [nav, setNav] = useState("overview");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [tourStep, setTourStep] = useState<number | null>(null);
+  const [tourRunning, setTourRunning] = useState(false);
+  const [tourError, setTourError] = useState<string | null>(null);
+  const [presenting, setPresenting] = useState(false);
   const convo = useRef<Conversation | null>(null);
   const listener = useRef<Listener | null>(null);
   const seq = useRef(0);
@@ -123,8 +135,10 @@ export function App() {
   useEffect(() => subscribe(SERVER_BASE, setSnap, setSimOk), []);
 
   const sawUi = useRef(false);
+  const toolFailed = useRef(false);
   const onTool = useCallback(
     (e: ToolEvent) => {
+      toolFailed.current ||= Boolean(e.result.isError);
       if (conn?.uiTools.has(e.name) && !e.result.isError) {
         sawUi.current = true;
         setPayload({
@@ -158,12 +172,13 @@ export function App() {
   const ask = useCallback(
     async (utterance: string) => {
       const u = utterance.trim();
-      if (!u || !convo.current || busy) return;
+      if (!u || !convo.current || busy) return false;
       stopSpeaking();
       setBusy(true);
       setCaptions((c) => [...c.slice(-3), { who: "you", text: u }]);
       try {
         sawUi.current = false;
+        toolFailed.current = false;
         const r =
           brain === "scripted"
             ? await convo.current.askScripted(u)
@@ -177,6 +192,7 @@ export function App() {
           polly: llm?.tts === "polly",
           muted,
         }).finally(() => setSpeaking(false));
+        return !r.error && !toolFailed.current;
       } catch (err) {
         setCaptions((c) => [
           ...c.slice(-3),
@@ -185,12 +201,79 @@ export function App() {
             text: `Sorry, something went wrong: ${(err as Error).message}`,
           },
         ]);
+        return false;
       } finally {
         setBusy(false);
       }
     },
     [brain, busy, llm, muted, refreshScreen],
   );
+
+  useEffect(() => {
+    const close = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPresenting(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, []);
+
+  const startTour = async () => {
+    if (!conn || busy || tourRunning) return;
+    setTourRunning(true);
+    setTourError(null);
+    stopSpeaking();
+    try {
+      const reset = await sim.reset(SERVER_BASE);
+      setSnap(reset as Snapshot);
+      convo.current = new Conversation(conn, SERVER_BASE, onTool);
+      setCaptions([]);
+      setTourStep(0);
+      await refreshScreen();
+    } catch (err) {
+      setTourError((err as Error).message);
+    } finally {
+      setTourRunning(false);
+    }
+  };
+
+  const nextScene = async () => {
+    const scene = tourStep === null ? undefined : TOUR[tourStep];
+    if (!scene || tourRunning || busy) return;
+    setTourRunning(true);
+    setTourError(null);
+    try {
+      if ("jump" in scene) await sim.clock(SERVER_BASE, "set", scene.jump);
+      if (await ask(scene.utterance)) setTourStep((step) => (step ?? 0) + 1);
+      else
+        setTourError(
+          "The scene could not complete. Check the response and retry, or switch Brain to scripted mode.",
+        );
+    } catch (err) {
+      setTourError((err as Error).message);
+    } finally {
+      setTourRunning(false);
+    }
+  };
+
+  const approvePlan = async () => {
+    if (!conn || !snap?.plan || busy) return;
+    setBusy(true);
+    try {
+      const result = await conn.callTool("apply_plan", {
+        planId: snap.plan.id,
+      });
+      setCaptions((c) => [
+        ...c.slice(-3),
+        { who: "you", text: "Approve this plan." },
+        { who: "alexa", text: toolText(result) },
+      ]);
+      await refreshScreen();
+    } catch (err) {
+      setTourError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // Push-to-talk: hold the mic button or the spacebar.
   useEffect(() => {
@@ -223,8 +306,13 @@ export function App() {
 
   useEffect(() => {
     const typing = (e: KeyboardEvent) =>
-      e.target instanceof HTMLInputElement ||
-      e.target instanceof HTMLTextAreaElement;
+      e.target instanceof Element &&
+      !e.target.closest(".mic") &&
+      Boolean(
+        e.target.closest(
+          'input, textarea, select, button, a, [contenteditable="true"], [role="button"]',
+        ),
+      );
     const down = (e: KeyboardEvent) => {
       if (e.code === "Space" && !e.repeat && !typing(e)) {
         e.preventDefault();
@@ -436,10 +524,21 @@ export function App() {
           </article>
         </section>
 
+        <DemoGuide
+          step={tourStep}
+          running={tourRunning || busy}
+          error={tourError}
+          ready={Boolean(conn && snap)}
+          logs={logs}
+          onStart={() => void startTour()}
+          onNext={() => void nextScene()}
+          onProof={() => navigate("inspector")}
+          onExport={() => snap && conn && downloadReceipt(snap, conn, logs)}
+        />
         <div className="layout">
           <section className="left">
             <section
-              className="panel simulator-panel"
+              className={`panel simulator-panel ${presenting ? "presenting" : ""}`}
               id="simulator"
               aria-label="Alexa+ simulator"
             >
@@ -456,6 +555,13 @@ export function App() {
                 </span>
               </header>
               <div className="simulator-controls">
+                <button
+                  className="btn small"
+                  aria-pressed={presenting}
+                  onClick={() => setPresenting(!presenting)}
+                >
+                  {presenting ? "Exit large screen" : "Large screen"}
+                </button>
                 <button
                   className="btn small"
                   onClick={() => setBrain(brain === "llm" ? "scripted" : "llm")}
@@ -607,6 +713,14 @@ export function App() {
                 </p>
               )}
             </section>
+            {snap && (
+              <PlanReview
+                snap={snap}
+                busy={busy || tourRunning}
+                onApprove={() => void approvePlan()}
+                onReplan={() => void ask(DEMO_LINES[0]!)}
+              />
+            )}
             <div id="clock">
               {snap && <ClockPanel snap={snap} base={SERVER_BASE} />}
             </div>
@@ -616,6 +730,7 @@ export function App() {
             {snap ? (
               <div id="household">
                 <HousePanel snap={snap} base={SERVER_BASE} />
+                <HouseholdRules snap={snap} />
               </div>
             ) : (
               <section className="panel">
@@ -648,6 +763,18 @@ export function App() {
                 onClick={() => setTab("inspector")}
               >
                 MCP Inspector ({logs.length})
+              </button>
+            </div>
+            <div className="receipt-toolbar">
+              <span>Observed actions and modeled savings</span>
+              <button
+                className="btn small"
+                disabled={!snap || !conn}
+                onClick={() =>
+                  snap && conn && downloadReceipt(snap, conn, logs)
+                }
+              >
+                Download demo receipt
               </button>
             </div>
             <div

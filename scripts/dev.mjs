@@ -7,7 +7,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+// Execute npm's JS entry point through Node; spawning npm.cmd fails with EINVAL on Windows.
+const npmCli = process.env.npm_execpath;
+if (!npmCli) throw new Error("Start this script with npm run dev.");
 
 function hasScript(pkgDir, script) {
   const file = join(root, pkgDir, "package.json");
@@ -17,8 +19,15 @@ function hasScript(pkgDir, script) {
 
 // The MCP App (plan timeline) is a single-file build the server serves as a resource.
 if (hasScript("packages/ui-apps", "build")) {
-  const r = spawnSync(npm, ["run", "build", "-w", "@off-peak/ui-apps"], { cwd: root, stdio: "inherit" });
-  if (r.status !== 0) console.warn("[dev] ui-apps build failed; the web client will use the native timeline.");
+  const r = spawnSync(
+    process.execPath,
+    [npmCli, "run", "build", "-w", "@off-peak/ui-apps"],
+    { cwd: root, stdio: "inherit" },
+  );
+  if (r.status !== 0)
+    console.warn(
+      "[dev] ui-apps build failed; the web client will use the native timeline.",
+    );
 }
 
 const procs = [
@@ -29,7 +38,12 @@ const procs = [
 const env = { SIM_ADMIN: "1", ...process.env };
 const children = procs.map((p) => {
   // Own process group, so shutdown reaches npm's children too (and `node --watch` can't respawn the server).
-  const child = spawn(npm, ["run", "dev", "-w", p.ws], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
+  const child = spawn(process.execPath, [npmCli, "run", "dev", "-w", p.ws], {
+    cwd: root,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: process.platform !== "win32",
+  });
   const prefix = `\x1b[${p.color}m[${p.name}]\x1b[0m `;
   const pipe = (stream, out) => {
     let buf = "";
@@ -52,7 +66,11 @@ const children = procs.map((p) => {
 let stopping = false;
 function killTree(child, signal) {
   try {
-    if (process.platform === "win32") child.kill(signal);
+    if (process.platform === "win32")
+      spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
+        stdio: "ignore",
+        windowsHide: true,
+      });
     else process.kill(-child.pid, signal);
   } catch {
     // already gone

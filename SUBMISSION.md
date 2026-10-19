@@ -1,97 +1,82 @@
-# Off-Peak: Devpost submission (draft)
-
-> **TODO(team) before submitting:**
-> - Fill in the video link, the GitHub usernames, the public `tou-rates` repo URL, and the Bedrock model actually used.
-> - Say honestly whether the video was recorded in Bedrock or scripted mode.
-> - If the repo is private, add the reviewers as collaborators.
+# OffPeak — Devpost submission text
 
 **Tagline:** Cut my power bill without wrecking my evening.
 
-**Track:** Alexa+ (self-hosted MCP server, protocol 2025-11-25, Streamable HTTP). **Mini challenges:** AWS Builder, Open Source.
+**Primary track:** Alexa+ — a self-hosted MCP server and a browser-based Alexa+ simulator.
 
-## The problem
-Time-of-use electricity rates now cover millions of US households. Peak power (4–9 PM) can cost twice what it costs overnight. People are told to "shift usage", but nobody wants to babysit a dryer at 9 PM, set a car charger by hand, or wake up to a car that didn't charge. Smart-home routines can switch things on and off. They don't know what electricity costs in *your* rate plan, they can't coordinate several appliances against deadlines and quiet hours, and they can't tell you what you saved.
+**Live demo:** <https://offpeak.patrickvaldivia123.workers.dev>
+
+**Source:** <https://github.com/Darthh/AWS-Alexa-Hackathon> · MIT.
+
+**Open Source contribution:** <https://github.com/Darthh/tou-rates> · MIT. Verified contributor: `Darthh`; confirm any additional team usernames before submitting.
+
+**Video:** Paste the public YouTube/Vimeo link after uploading the real recording. Record in mock or scripted mode and identify that mode honestly. No live Bedrock model has been validated for this submission.
+
+## Inspiration
+
+A cheap schedule is useless if the car is not charged by 7 AM or the dryer wakes the household. We wanted an energy assistant that can explain a lower-cost evening, ask for approval, and keep the household's promises.
+
+The target customer is a household with time-of-use electricity pricing and flexible loads such as an EV, dishwasher and laundry. The opportunity is coordinating those loads around deadlines, quiet hours and shared electrical capacity through one conversation.
 
 ## What it does
-Off-Peak is an Alexa+ add-on that works three ways.
 
-**1. Plans appliances against your real rate.** Off-Peak loads the household's real utility rate plan from the OpenEI Utility Rate Database. Say *"Car charged by 7, dishes and laundry tonight, nothing loud after 10"* and it proposes a plan:
-- the washer now
-- the dryer at 9 PM, when peak ends and before quiet hours
-- the dishwasher and the car overnight, at the cheapest rate
+Ask: “I need the car charged by 7, dishes and laundry done tonight, nothing loud after 10.” OffPeak proposes the washer now, dryer at 9 PM, and dishwasher and car overnight. It shows the timeline, task costs, deadlines, quiet hours and load checks before anything runs.
 
-On our demo rate that's **about $7.74 cheaper** than running it all now. It runs the plan when you say "do it."
+In the seeded weekday scenario, the run-now task-energy baseline is **$17.31**, the proposed task cost is **$9.57**, and the modeled difference is **$7.74**. These numbers use a clearly labeled synthetic demo tariff, not a measured utility bill or a forecast of yearly savings. Fixed charges, demand charges and other whole-bill components are outside this calculation.
 
-**2. Turns off what nobody is using.**
-- **Away:** "We're heading out until 9" switches off standby loads and sets cooling back, while the fridge, router, and aquarium are protected and a running washer is never interrupted. Pre-cooling waits until peak ends.
-- **One room:** "It's just me in the office" powers down the other rooms.
-- **Idle:** standby devices in empty rooms go off after 30 minutes.
+After explicit approval, a deterministic scheduler executes the plan. Away and one-room modes reduce simulated standby loads while protecting the fridge, Wi-Fi router, aquarium and running cycles. “Why did the TV turn off?” reads the recorded reason; “Turn it back on” restores the previous state.
 
-**3. Earns trust.**
-- Every action has a reason and a dollar figure.
-- "Why did the TV turn off?" gets a plain answer, and "Turn it back on" restores exactly what changed.
-- "How much did Off-Peak save me today?" reports dollars by source.
+The guided walkthrough makes that sequence easy to review. The Inspector shows actual MCP messages, and a downloadable demo receipt includes observed protocol operations, plan costs, rule checks and protected-device state without exporting raw conversation or RPC payloads.
 
-**Rules > Presence > Price:** Off-Peak never trades a broken promise for a few cents.
+**Rules → presence → electricity price.** A proposal with conflicts is blocked. If time, household rules or the tariff change, OffPeak requires a fresh proposal rather than silently applying outdated assumptions.
 
 ## How we built it
-- **MCP server (TypeScript, `@modelcontextprotocol/sdk` 1.32.1):**
-  - Stateless Streamable HTTP on protocol 2025-11-25, with a new server per request.
-  - 17 tools with routing-oriented descriptions, accurate annotations, Zod-validated inputs, output schemas, and speakable results (at most two sentences, one money figure, 12-hour times).
-  - 4 resources, including an **MCP App** (`ui://off-peak/plan.html`) that renders the plan timeline on an Echo Show.
-- **Deterministic core:**
-  - A planner places washer→dryer pairs jointly, charges the EV in the cheapest 15-minute slots within the household load headroom, honors deadlines and quiet hours, and returns priced options when something can't fit.
-  - Presence and savings engines.
-  - All unit-tested, including the DST spring-forward night and a golden end-to-end scenario.
-  - LLMs only at the edges.
-- **`tou-rates` (open source, MIT):**
-  - An OpenEI client and normalizer: tier-1 prices, per-month period naming, `$/day` fixed charges, newest-first plan lookup.
-  - Price math (`priceAt`, `slots`, `describeDay`) on local wall-clock hours.
-- **Alexa+ simulator:**
-  - A real MCP client in the browser, with an MCP Inspector panel that shows `initialize`, `tools/list`, and `tools/call` live.
-  - An LLM loop via Amazon Bedrock Converse with tool use, plus a zero-cost mock and a scripted mode.
-  - Speech in and out, Echo Show and voice-only (Echo Dot) views.
-  - A live simulated house over SSE, and a sim clock with time travel.
 
-## How we used AWS
-- **Amazon Bedrock (Converse + tool use):** the simulated Alexa's reasoning loop, and a fallback parser that turns natural-language household rules into JSON validated with Zod.
-- **AWS Lambda + Function URL:** the MCP server, unmodified Express behind the Lambda Web Adapter, plus an executor Lambda.
-- **Amazon DynamoDB:** a single-table design for the household, devices, rules, plans, scheduled steps, and ledger.
-- **Amazon EventBridge Scheduler:** one-time `at()` schedules in the household's timezone that start each appliance step and delete themselves.
-- **Amazon Polly:** optional neural voice.
-- **AWS CDK (TypeScript):** the whole stack, deployable and destroyable.
+The browser is a real MCP client using `@modelcontextprotocol/sdk` 1.32.1. It initializes protocol **2025-11-25**, discovers tools and resources, and calls **17 tools** over **Streamable HTTP**. The TypeScript/Express server uses a fresh MCP server and transport per request; household state lives in a separate store.
 
-> **TODO(team):** state what was deployed and tested live, and the Bedrock model used.
+Pricing, scheduling, presence and savings use deterministic TypeScript. A conversation model chooses tools and phrases responses; it does not invent electricity prices or compute savings. The public demo uses the zero-cost mock router, with a scripted fallback. The optional Bedrock Converse proxy follows the same browser-owned tool loop.
 
-## Challenges
-- MCP SDK v1 vs. v2 (protocol 2025-11-25 vs. 2026-07-28) and the matching ext-apps versions.
-- SDK clients reject `isError` results whose `structuredContent` doesn't match the output schema, so we moved error details to `_meta`.
-- An MCP Apps host race where the View's `ui/initialize` arrived before the bridge was listening.
-- Real tariffs are messy: stale rates first, superseded versions, period indices reused across seasons, `$/day` fixed charges.
-- Keeping every tool response short enough to speak without losing the number that matters.
+The light console preserves text input, push-to-talk, browser speech, voice-only mode, occupancy controls, simulated time, ledger and protocol Inspector. The MCP App timeline and native fallback consume the same structured tool results. Large screen restores a readable Echo Show-style presentation view.
 
-All of it is documented in FRICTION_LOG.md.
+The deployed prototype runs on Cloudflare Workers with an isolated SQLite Durable Object per browser. It uses simulated devices and bundled tariffs. It is not connected to an Echo, the Alexa developer console, or the entrant's real home.
 
-## Accomplishments
-- The golden scenario holds end to end: a weekday at 5:30 PM gives the plan above, $7.74 saved, the car at 80% by 4:45 AM, and the load never over 9.6 kW.
-- Every action is explainable and undoable.
-- The demo runs with zero keys and no network.
+## AWS integration and validation boundaries
 
-## What we learned
-Trustworthy automation is mostly about **constraints and receipts**, not cleverness: deadlines, quiet hours, never-off devices, an exact undo, and a reason for every action. MCP tool design for voice is its own craft: decision first, one number, no IDs, and a clarifying question when "the lamp" is ambiguous.
+The repository implements SDK integrations for Bedrock Converse/tool use and rule parsing, DynamoDB persistence, EventBridge one-time schedules, optional Polly speech, and a Lambda/Web Adapter deployment path described by AWS CDK. These paths are compiled or tested with injected clients. The live public URL uses **Cloudflare and mock conversation**, not AWS runtime services.
 
-## What's next
-- Read Alexa's own occupancy and Hunches signals, with consent.
-- Proactive announcements ("the car is charged").
-- Control the customer's Alexa-connected devices directly instead of the simulated home or Home Assistant.
-- Tiered and baseline pricing, solar and export credits, and a thermal model for setback savings.
+Do not describe those adapters as a completed live AWS deployment. No Bedrock model ID, real Echo session, live smart-home action or Kiro usage is asserted. For AWS Builder, include the actual validation evidence the team completes; see [the readiness checklist](docs/hackathon-readiness.md).
 
-## Potential impact
-Most of a TOU household's savings come from a handful of flexible loads: the EV, laundry, the dishwasher, and the water heater. Standby waste in empty rooms adds tens of dollars a year. Off-Peak captures both without asking people to change habits. Shifting load out of 4–9 PM also flattens the evening peak that utilities pay the most to serve.
+## Challenges and feedback
 
-## Open source mini challenge
-- **Repository:** `tou-rates` (MIT). **TODO(team):** add the public repo URL.
-- **What:** Normalizes US residential time-of-use tariffs from the OpenEI URDB into schedulable prices.
-- **How:** An OpenEI client, a normalizer (per-month period naming, cross-season period splitting, fixed-charge units), and DST-correct price math. One runtime dependency, 21 tests against real fixtures.
-- **Why it matters:** Every energy app that wants to answer "when is power cheap for *this* household" has to solve the same messy URDB edge cases first.
-- **Team GitHub usernames:** **TODO(team)**
+We documented concrete SDK issues: version compatibility, tool error schemas, the MCP App initialization race, pre-connection host context, bundle overhead and the optional GET stream returning 405 on a stateless server. This pass adds reproducible Windows launcher/export fixes and Workers deployment observations. Each friction entry records the task, steps, expected/actual result, severity, workaround and suggestion.
+
+The feedback file separately addresses the MCP SDK, MCP Inspector, MCP Apps, OpenEI, AWS adapters, React/Vite, Cloudflare, test tools and REA, with an explicit boundary between live experience and offline validation.
+
+## What we accomplished
+
+- A complete no-key demo with 20 simulated devices, six rooms, shared whole-home devices and an actual MCP conversation loop.
+- The golden scenario: **$7.74 modeled task savings**, EV at **80% by 4:45 AM**, deadlines and quiet hours respected, and planned load within **9.6 kW**.
+- Server-side approval checks, explainable recorded actions, protected devices and supported undo operations.
+- A public MIT tariff library with timezone/DST-aware prices, real tariff fixtures, a synthetic demo and 21 independent tests.
+- 128 core/server tests and six browser scenarios, including the guided walkthrough, downloadable evidence, fallback views, visitor isolation, approval and stale-plan recovery.
+
+## Impact and next steps
+
+OffPeak makes the tradeoff visible: what a particular set of tasks costs now, what a valid proposed schedule costs, and which household constraints determine the difference. It is useful without asking a household to understand tariff schedules or manually coordinate four appliances.
+
+Real deployment needs account/device authorization, current applicable tariffs, live integration validation and operational controls. Future work includes consent-based occupancy inputs, proactive completion announcements, richer tariff structures, solar/export accounting and validated comfort modeling. No guaranteed or population-wide savings are claimed.
+
+## Built during the submission window
+
+This repository was created on October 17, 2026, within the official August 31–October 23 submission period. On October 19 we shipped the AWS-style console and live public demo, then added the guided review, task-cost/guardrail evidence, large screen, downloadable receipts, stronger approval checks, Windows setup fixes and standalone Open Source contribution. The Git history and separate library commit provide reviewable evidence.
+
+## Open Source mini challenge fields
+
+- **Contribution URL:** <https://github.com/Darthh/tou-rates/commit/d2fb907>
+- **Project repository:** <https://github.com/Darthh/tou-rates>
+- **GitHub username:** `Darthh` (confirm additional teammates separately).
+- **What:** A new MIT TypeScript project for residential OpenEI time-of-use tariffs.
+- **How:** Normalize prices/schedules and fixed-charge units, then expose timezone/DST-aware price lookup and price slots. One runtime dependency, no dependency on the parent app, 21 tests, and reproducible standalone builds.
+- **Why it matters:** Other energy applications can reuse the tariff handling independently of OffPeak's simulator.
+
+This is prepared entry text. A public video link, team declarations and final Devpost submission are still required. The official deadline is **Friday, October 23, 2026 at noon PDT**.
