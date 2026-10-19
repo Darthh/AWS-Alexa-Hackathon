@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "node --env-file-if-exists=../../.env --watch src/main.ts",
     "start": "node --env-file-if-exists=../../.env src/main.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "build:lambda": "npm run build -w @off-peak/ui-apps --prefix ../.. && vite build -c vite.lambda.config.ts && node scripts/package-lambda.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1153.0",
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "@types/luxon": "^3.7.6"
+    "@types/luxon": "^3.7.6",
+    "vite": "8.3.4"
   }
 }

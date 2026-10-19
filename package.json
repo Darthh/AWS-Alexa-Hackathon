@@ -22,7 +22,9 @@
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run typecheck --workspaces --if-present",
     "inspector": "npx -y @modelcontextprotocol/inspector@0.22.0",
-    "bedrock:models": "node scripts/bedrock-models.mjs"
+    "bedrock:models": "node scripts/bedrock-models.mjs",
+    "build:lambda": "npm run build:lambda -w @off-peak/server",
+    "cdk:synth": "cd infra && npm install && npx cdk synth"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",

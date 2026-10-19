@@ -9,3 +9,4 @@ coverage/
 infra/cdk.out/
 infra/node_modules/
 packages/server/dist-lambda/
+out/

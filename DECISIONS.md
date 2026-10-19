@@ -43,3 +43,10 @@ One line per decision, newest at the bottom of each section.
 - 2026-10-19 · Speech never blocks the next turn; a new utterance interrupts it. Polly is used only when `POLLY_VOICE` is set, else `speechSynthesis`.
 - 2026-10-19 · After a turn with no UI-bound tool result, the host refreshes the Echo Show with `get_home_status` (what a real screen device would show).
 - 2026-10-19 · The MCP App is hosted with ext-apps' `AppBridge` in a `sandbox="allow-scripts"` srcdoc iframe; on any failure within 4 s the web client renders the same view natively from `structuredContent` (shared renderer in `packages/ui-apps/src/timeline.ts`).
+
+## AWS deploy & open source
+- 2026-10-19 · Lambda bundle is built with Vite SSR (`vite.lambda.config.ts`, `noExternal: true`) instead of adding esbuild for CDK `NodejsFunction`; CDK uses `Code.fromAsset(dist-lambda)`.
+- 2026-10-19 · MCP server on Lambda runs the unmodified Express app behind the AWS Lambda Web Adapter layer (`run.sh` → `node main.mjs`, port 8080). The layer version is a CDK context value (`lambdaWebAdapterLayerVersion`, default 25 — verify before deploy).
+- 2026-10-19 · The executor's ARN is constructed from a fixed function name (`offpeak-executor`) so both Lambdas can carry `EXECUTOR_LAMBDA_ARN` without a CloudFormation cycle.
+- 2026-10-19 · Function URL auth is `NONE` for the hackathon demo (multi-household auth is in BACKLOG); the README says to `cdk destroy` after testing. Sim admin routes are off in the cloud (`SIM_ADMIN=0`).
+- 2026-10-19 · `tou-rates` is exported to a standalone repo by `scripts/export-tou-rates.mjs` (rewrites package.json to `dist/`, copies fixtures, fixes test paths); verified: install + 21 tests + build. Publishing the public GitHub repo is a team action.

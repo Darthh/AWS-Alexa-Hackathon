@@ -1,0 +1,10 @@
+{
+  "app": "node bin/offpeak.ts",
+  "context": {
+    "webOrigin": "http://localhost:5173",
+    "householdTz": "America/Los_Angeles",
+    "llmMode": "mock",
+    "bedrockModelId": "",
+    "lambdaWebAdapterLayerVersion": "25"
+  }
+}
