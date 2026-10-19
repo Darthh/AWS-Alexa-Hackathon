@@ -42,6 +42,8 @@ No npm registry release is claimed. The public source repository supports clonin
 
 ## Optional AWS validation
 
+The user selected a free pass with validation instructions only. Follow the [AWS validation runbook](aws-validation.md) for reproducible local checks, optional future read-only discovery, a deferred Bedrock smoke test and an evidence template. No live AWS calls or resource creation were performed for this follow-up.
+
 The public demo is hosted on Cloudflare, with mock conversation, simulated devices and local scheduling. Hosting there does not demonstrate AWS runtime use. Lambda bundling/asset packaging and CDK synthesis passed locally in this pass after fixing Windows path conversion; neither provisions resources.
 
 For a live AWS validation, use an existing account and an explicitly approved budget, discover a model the account can use, exercise the existing Converse tool loop, and record the actual model, region, commands and sanitized outcomes. Never put credentials, account identifiers, private responses, or device tokens into the submission. The existing optional CDK stack needs access controls before public use; no Organization, Control Tower or paid-plan upgrade is needed for this work.

@@ -44,7 +44,7 @@ The deployed prototype runs on Cloudflare Workers with an isolated SQLite Durabl
 
 The repository implements SDK integrations for Bedrock Converse/tool use and rule parsing, DynamoDB persistence, EventBridge one-time schedules, optional Polly speech, and a Lambda/Web Adapter deployment path described by AWS CDK. These paths are compiled or tested with injected clients. The live public URL uses **Cloudflare and mock conversation**, not AWS runtime services.
 
-Do not describe those adapters as a completed live AWS deployment. No Bedrock model ID, real Echo session, live smart-home action or Kiro usage is asserted. For AWS Builder, include the actual validation evidence the team completes; see [the readiness checklist](docs/hackathon-readiness.md).
+Do not describe those adapters as a completed live AWS deployment. No Bedrock model ID, real Echo session, live smart-home action or Kiro usage is asserted. For AWS Builder, include the actual validation evidence the team completes; see [the readiness checklist](docs/hackathon-readiness.md) and [AWS validation runbook](docs/aws-validation.md). This pass stays free and prepares instructions without live AWS calls.
 
 ## Challenges and feedback
 

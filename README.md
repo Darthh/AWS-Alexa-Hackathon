@@ -468,6 +468,8 @@ The design reference is the [AWS Management Console](https://aws.amazon.com/cons
 
 ## AWS deployment
 
+For this pass, keep the demo free and use the [AWS validation runbook](docs/aws-validation.md) for local checks and instructions for a future account/model test. No live AWS-service use is claimed. The runbook separates offline evidence, optional catalog discovery, Bedrock inference and deployed infrastructure.
+
 ### What the stack contains
 
 | Service | Role in Off-Peak |
