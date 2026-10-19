@@ -1,26 +1,21 @@
-<div align="center">
+<p align="center">
+  <img src="docs/assets/off-peak-logo.png" alt="Off-Peak logo: a navy OP clock mark with an orange peak segment and Off-Peak wordmark" width="520">
+</p>
 
-<img src="docs/assets/off-peak-banner.svg" alt="Off-Peak — conversational energy planning that puts rules before presence and price" width="100%" />
+<h1 align="center">Off-Peak</h1>
 
-<br />
+<p align="center"><strong>Cut my power bill without wrecking my evening.</strong><br>Household rules come first. A deterministic planner schedules. MCP connects the conversation.</p>
 
-**Tell your home what needs to happen. Let Off-Peak work out when.**
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-ff9900" alt="MIT license"></a>
+  <a href="#mcp-tools-and-resources"><img src="https://img.shields.io/badge/MCP-2025--11--25-232f3e" alt="MCP protocol 2025-11-25"></a>
+  <a href="#quick-start"><img src="https://img.shields.io/badge/demo-no_API_keys-ff9900" alt="Local demo without API keys"></a>
+  <img src="https://img.shields.io/badge/Node.js-%3E%3D22.18-333333" alt="Node.js 22.18 or newer">
+</p>
 
-A conversational energy scheduler built for the Alexa+ hackathon track, with a real Model Context Protocol server, a browser-based Alexa+ simulator, and an offline demo.
+Built for the **Alexa+ hackathon track**. Off-Peak combines the household's electricity tariff, appliance deadlines, and room usage into an explainable schedule through a real Model Context Protocol server and a browser-based Alexa+ simulator.
 
-[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A522.18-43853D?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-6.0.3-3178C6?style=flat-square&logo=typescript&logoColor=white)](package.json)
-[![MCP](https://img.shields.io/badge/MCP-2025--11--25-6DD6FF?style=flat-square)](#mcp-tools-and-resources)
-[![Offline demo](https://img.shields.io/badge/Demo-no_API_keys-52D6AA?style=flat-square)](#quick-start)
-[![License: MIT](https://img.shields.io/badge/License-MIT-F4AF45?style=flat-square)](LICENSE)
-
-[**Run locally**](#quick-start) · [**Walk through the demo**](#demo-walkthrough) · [**Explore the architecture**](#architecture) · [**Read the tool reference**](#mcp-tools-and-resources)
-
-</div>
-
----
-
-> **Project status:** the local simulator, deterministic planner, MCP tools, browser client, and optional AWS CDK deployment path are implemented. Alexa+ is simulated in this repository; it is not connected to an Echo device or the Alexa developer console. Cloud deployment and real-device operation still require account-specific setup and live validation. See [current boundaries](#current-boundaries).
+**Status: hackathon prototype with an offline local demo.** The simulator, deterministic planner, MCP tools, browser client, and optional AWS CDK deployment path are implemented. Alexa+ is simulated here; the repository is not connected to an Echo device or the Alexa developer console. Cloud deployment and real-device operation require account-specific setup and live validation. See [current boundaries](#current-boundaries).
 
 ## Why Off-Peak exists
 
