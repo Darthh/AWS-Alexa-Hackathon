@@ -1,280 +1,706 @@
-# Off-Peak: cut my power bill without wrecking my evening
+<div align="center">
 
-**An Alexa+ add-on (self-hosted MCP server) that runs your appliances in the cheapest hours of your real utility rate, turns off power nobody is using, and never breaks a household rule.**
+<img src="docs/assets/off-peak-banner.svg" alt="Off-Peak — conversational energy planning that puts rules before presence and price" width="100%" />
 
-`MCP 2025-11-25` · `Streamable HTTP` · `TypeScript` · `AWS Bedrock · Lambda · DynamoDB · EventBridge Scheduler` · `MIT`
+<br />
 
-> "I need the car charged by 7, dishes and laundry done tonight, nothing loud after 10."
->
-> **Alexa:** "Here's the plan: the washer now, the dryer at 9 PM, and the dishwasher and the car overnight, about $7.74 cheaper than running it all now. Should I go ahead?"
+**Tell your home what needs to happen. Let Off-Peak work out when.**
 
-![Proposed plan on the simulated Echo Show](docs/screenshots/01-plan.png)
+A conversational energy scheduler built for the Alexa+ hackathon track, with a real Model Context Protocol server, a browser-based Alexa+ simulator, and an offline demo.
+
+[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A522.18-43853D?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0.3-3178C6?style=flat-square&logo=typescript&logoColor=white)](package.json)
+[![MCP](https://img.shields.io/badge/MCP-2025--11--25-6DD6FF?style=flat-square)](#mcp-tools-and-resources)
+[![Offline demo](https://img.shields.io/badge/Demo-no_API_keys-52D6AA?style=flat-square)](#quick-start)
+[![License: MIT](https://img.shields.io/badge/License-MIT-F4AF45?style=flat-square)](LICENSE)
+
+[**Run locally**](#quick-start) · [**Walk through the demo**](#demo-walkthrough) · [**Explore the architecture**](#architecture) · [**Read the tool reference**](#mcp-tools-and-resources)
+
+</div>
 
 ---
 
-## Quick start (zero keys, about 5 minutes)
+> **Project status:** the local simulator, deterministic planner, MCP tools, browser client, and optional AWS CDK deployment path are implemented. Alexa+ is simulated in this repository; it is not connected to an Echo device or the Alexa developer console. Cloud deployment and real-device operation still require account-specific setup and live validation. See [current boundaries](#current-boundaries).
 
-Requirements: **Node.js 22.18 or newer** (it runs TypeScript natively) and npm.
+## Why Off-Peak exists
+
+Electricity prices change throughout the day, but the household still needs clean clothes, a charged car, and a comfortable evening. A cheaper schedule is useful only if it respects those needs.
+
+Off-Peak combines the household's time-of-use tariff, appliance requirements, room usage, and explicit rules into a plan people can understand and approve. It can move flexible loads into cheaper hours, reduce standby power in empty rooms, explain an action, and restore the state it changed.
+
+Its decision order is:
+
+**Household rules → presence → electricity price.**
+
+The planner and money calculations are deterministic TypeScript. A language model can interpret a request and phrase a response, but it does not invent the electricity price, choose an unvalidated schedule, or calculate the saving.
+
+## Contents
+
+- [See it in action](#see-it-in-action)
+- [What it can do](#what-it-can-do)
+- [Quick start](#quick-start)
+- [Demo walkthrough](#demo-walkthrough)
+- [Architecture](#architecture)
+- [MCP tools and resources](#mcp-tools-and-resources)
+- [Configuration](#configuration)
+- [Optional integrations](#optional-integrations)
+- [AWS deployment](#aws-deployment)
+- [Tariffs and savings](#tariffs-and-savings)
+- [Development and testing](#development-and-testing)
+- [Repository map](#repository-map)
+- [Security and privacy](#security-and-privacy)
+- [Troubleshooting](#troubleshooting)
+- [Current boundaries](#current-boundaries)
+- [Contributing](#contributing)
+- [License](#license)
+
+## See it in action
+
+![The real Off-Peak simulator showing a proposed washer, dryer, dishwasher, and EV charging schedule, with $7.74 in synthetic demo savings](docs/screenshots/01-plan.png)
+
+*Captured from the running local application in mock LLM mode. The timeline is the MCP App, the browser is connected to 17 real MCP tools, and the rate is explicitly labeled as synthetic.*
+
+> “I need the car charged by 7, dishes and laundry done tonight, nothing loud after 10.”
+
+Off-Peak proposes the washer now, the dryer at 9 PM, and the dishwasher and car overnight. It asks before applying the plan, shows the schedule on an Echo Show-style screen, and explains the price and household constraints behind it.
+
+<details>
+<summary><strong>More screens: away mode, savings, and voice-only</strong></summary>
+
+| Away mode | Savings | Voice-only view |
+| --- | --- | --- |
+| ![Away mode preserves protected devices](docs/screenshots/02-away.png) | ![Savings breakdown on the simulated screen](docs/screenshots/03-savings.png) | ![Voice-only Echo Dot-style simulator](docs/screenshots/04-voice-only.png) |
+
+</details>
+
+## What it can do
+
+| Capability | What happens | Where it lives |
+| --- | --- | --- |
+| **Price-aware planning** | Coordinates EV charging, dishwasher, washer, and dryer around time-of-use prices. | [`core/planner.ts`](packages/core/src/planner.ts) |
+| **Household guardrails** | Checks deadlines, quiet hours, washer-before-dryer dependencies, and a household load limit. Infeasible requests return conflicts and alternatives. | [`core`](packages/core/src), [`services/plans.ts`](packages/server/src/services/plans.ts) |
+| **Presence modes** | Supports home, away, sleep, and active-room modes, plus arrival scheduling and idle-off behavior. | [`services/presence.ts`](packages/server/src/services/presence.ts) |
+| **Protected devices** | Automatic presence actions preserve never-off devices and running cycles. Explicit protected-device off requests require confirmation. | [`core/presence.ts`](packages/core/src/presence.ts), [`services/control.ts`](packages/server/src/services/control.ts) |
+| **Explain and undo** | Records actions and reasons in a ledger and restores recorded previous state where supported. | [`services/trust.ts`](packages/server/src/services/trust.ts) |
+| **Savings breakdown** | Separates load shifting, idle savings, and room/away savings; flags modeled estimates. | [`core/savings.ts`](packages/core/src/savings.ts) |
+| **Real MCP traffic** | Browser performs initialization, tool discovery, tool calls, and resource reads over Streamable HTTP. | [`web/lib/mcp.ts`](packages/web/src/lib/mcp.ts) |
+| **Screen and voice** | Echo Show-style plan timeline, voice-only view, text input, push-to-talk, browser speech, and optional Polly. | [`web`](packages/web), [`ui-apps`](packages/ui-apps) |
+| **Offline fallback** | Bundled tariffs, simulated devices, simulated time, mock LLM, and scripted intent routing keep the text demo local. | [`fixtures`](fixtures), [`core/intents.ts`](packages/core/src/intents.ts) |
+
+## Quick start
+
+### Requirements
+
+- **Node.js 22.18 or newer.** The server executes TypeScript using Node's native type stripping.
+- **npm** with workspace support and **Git**.
+- A modern browser. Text input is always available; speech input depends on browser support and microphone permission.
+
+### Install and run
 
 ```bash
 git clone https://github.com/Darthh/AWS-Alexa-Hackathon.git
 cd AWS-Alexa-Hackathon
-npm install
-npm run dev            # MCP server on :8787, Alexa+ simulator on :5173
+npm ci
+cp .env.example .env
+npm run dev
 ```
 
-Open **http://localhost:5173**, then:
+Open **<http://localhost:5173>**.
 
-1. Click the first demo chip, or **hold the spacebar and talk**: "I need the car charged by 7, dishes and laundry done tonight, nothing loud after 10."
-2. Say **"Do it."**
-3. Press **→ 6:45 PM** on the sim clock, then say "We're heading out until 9."
-4. Ask "Why did the TV turn off?", then say "Turn it back on."
-5. Press **→ 7 AM** and ask "How much did Off-Peak save me today?"
+The defaults use demo tariffs, simulated devices and time, JSON persistence, a local scheduler, and the mock LLM. **No AWS credentials, OpenEI key, smart-home hardware, or Alexa device are required for this path.** Dependencies must be downloaded during installation; browser speech services may have their own network requirements.
 
-Everything runs offline: synthetic demo rate, simulated home, simulated clock, and a mock LLM. Add `?mode=scripted` to the URL to skip the LLM entirely. That's the backup used for recording the video.
+| Local address | Purpose |
+| --- | --- |
+| `http://localhost:5173` | Alexa+ simulator and developer panels |
+| `http://localhost:8787/mcp` | MCP Streamable HTTP endpoint |
+| `http://localhost:8787/health` | Server health and clock state |
 
-```bash
-npm test               # 117 tests: planner golden scenario, DST, MCP protocol, the demo end to end
-npm run lint           # strict TypeScript across all packages
-npx @modelcontextprotocol/inspector@0.22.0 --cli http://localhost:8787/mcp --transport http --method tools/list
-```
+`npm run dev` builds the single-file MCP App, then starts the server and web client. **Ctrl+C** stops both processes. The simulator clock starts paused so the demo does not run away while you explain it.
 
----
+<details>
+<summary><strong>Useful alternate demo modes</strong></summary>
 
-## What it does
+| URL | What changes |
+| --- | --- |
+| `http://localhost:5173/?mode=scripted` | Bypasses the LLM loop and maps supported phrases directly to real MCP calls. |
+| `http://localhost:5173/?ui=native` | Renders tool output natively instead of using the MCP App iframe. |
+| `http://localhost:5173/?mode=scripted&ui=native` | Combines both fallbacks for a predictable demonstration. |
 
-In priority order:
+The **Brain**, **Screen**, **Echo Show / Voice-only**, and **Voice / Muted** controls are also available in the top bar. Hold the microphone button or spacebar for push-to-talk when the browser supports speech recognition; type or use the example buttons otherwise.
 
-1. **Price-aware scheduling (the headline).** Off-Peak loads the household's real time-of-use rate from the OpenEI Utility Rate Database and plans the EV, dishwasher, washer, and dryer into the cheapest hours. It honors deadlines, quiet hours, washer-before-dryer, and a whole-house load limit. Every plan is compared with "run it all now," in dollars.
-2. **Presence-aware on/off.**
-   - **Away:** "We're heading out until 9" turns off standby loads and sets cooling back. Cooling comes back on 30 minutes before you return, but never during peak.
-   - **Zone:** "It's just me in the office" powers down the other rooms.
-   - **Idle-off:** standby devices in empty rooms turn off after 30 minutes.
-   - **Return:** when you come back, it restores only what Off-Peak turned off.
-3. **Household rules.** Examples: "car at 80% by 7 on weekdays," "nothing loud after 10," "never turn off the fish tank," "ask me before turning off the TV," "stay under 9.6 kW."
+</details>
 
-**Rules > Presence > Price.** Off-Peak never trades a broken promise for a few cents. The fridge, router, and aquarium are protected server-side, and a running dishwasher is never interrupted mid-cycle.
+## Demo walkthrough
 
-**Trust is built in.** Every action is in a ledger with a plain-language reason and its dollar impact. `explain` tells you why ("The TV turned off at 6:45 PM because you left home and it was drawing 15 W on standby."), and `undo` restores the exact previous state.
+Use a fresh default demo state or the **Reset** button in **Sim clock**. Reset clears the current demo household, plans, jobs, ledger, and related stored state. It is intended for the simulator.
 
-| Away mode at 6:45 PM | Savings at 7 AM | Voice-only (Echo Dot) |
-|---|---|---|
-| ![Away](docs/screenshots/02-away.png) | ![Savings](docs/screenshots/03-savings.png) | ![Voice only](docs/screenshots/04-voice-only.png) |
+### The seeded household
 
-## Why it's different
+- **20 devices** across six rooms and a shared **Whole home** zone.
+- EV starts at **35%**; the weekday rule requests **80% by 7 AM**.
+- No noisy appliances from **10 PM to 7 AM**.
+- Household load limit: **9.6 kW**.
+- Fridge, Wi-Fi router, and aquarium are protected never-off devices.
+- Default timezone: **America/Los_Angeles**.
+- Simulated time begins at the most recent weekday **5:30 PM**, paused; default playback is **60×**.
 
-Alexa already has building blocks:
-- **Hunches** guess when you're away or asleep and can turn off lights or adjust thermostats and water heaters.
-- **Routines** run when you leave or arrive, or when you say "I'm heading out."
-- **Echo ultrasound occupancy routines** are set up by hand, room by room.
-- **Smart Thermostat** nudges the setpoint toward cleaner grid times.
-- **The Energy Dashboard** reports usage after the fact.
+The authoritative seed is [`fixtures/demo-home.json`](fixtures/demo-home.json).
 
-None of these plan around **the household's actual rate-plan prices**. None **coordinate several appliances against deadlines, quiet hours, and a household load limit**. None **report savings in dollars with a reason for every action**.
+### A short presentation sequence
 
-Off-Peak does all three in one conversational plan, with undo.
+| Step | Say, type, or click | What to show |
+| --- | --- | --- |
+| **1. Make a plan** | “I need the car charged by 7, dishes and laundry done tonight, nothing loud after 10.” | Proposed timeline, constraint checks, and the request for confirmation. The demo already includes the quiet-hours rule. |
+| **2. Confirm** | “Do it.” | Plan applied; washer starts; future steps become scheduled. |
+| **3. Leave home** | Jump to **6:45 PM**, then “We're heading out until 9.” | Standby/room changes, protected devices left on, and the running washer preserved. |
+| **4. Inspect trust** | “Why did the TV turn off?” then “Turn it back on.” | Recorded explanation followed by undo of that action. |
+| **5. Use one room** | “It's just me in the office.” | Active-room mode and devices outside the active room. |
+| **6. Advance time** | Jump forward to **9 PM**, **Midnight**, then **7 AM**. | Scheduled appliance execution and the EV reaching its target. Clock jumps replay due work in order. |
+| **7. Explain the result** | “How much did Off-Peak save me this week?” | Savings across the evening and overnight work; inspect the ledger and **MCP Inspector**. |
 
----
+The clock controls jump **forward to the next occurrence** of a time. Use Reset to return to the initial scenario rather than trying to jump backward.
+
+### Reproducible planning result
+
+For the default weekday scenario, the integration test verifies:
+
+| Metric | Synthetic demo result |
+| --- | ---: |
+| Run-now baseline | **$17.31** |
+| Proposed plan | **$9.57** |
+| Difference | **$7.74** |
+
+The washer runs **5:30–7 PM**, dryer **9–10 PM**, dishwasher **midnight–2 AM**, and car reaches 80% by **4:45 AM**. EV charging can contain multiple steps as load headroom changes.
+
+These are **fixture-based calculations, not measured utility-bill savings**. Also, “today” resets at midnight in the household timezone: the golden test expects **$7.20 today** at the following 7 AM for the overnight car and dishwasher, while the week total captures **$7.74** for the whole scenario. See [`scenario.golden.test.ts`](packages/server/test/scenario.golden.test.ts).
 
 ## Architecture
 
 ```mermaid
-flowchart LR
-  subgraph Browser["Alexa+ simulator (packages/web)"]
-    UI["Echo Show / Echo Dot UI<br/>speech in/out, captions"]
-    MC["MCP client<br/>SDK v1 Client + StreamableHTTPClientTransport"]
-    INS["MCP Inspector panel"]
-    APP["MCP App iframe<br/>ui://off-peak/plan.html (AppBridge)"]
-    UI --> MC
-    MC -. logs .-> INS
-    MC --> APP
-  end
-
-  subgraph Server["Off-Peak server (packages/server, Express)"]
-    MCP["POST /mcp<br/>stateless Streamable HTTP<br/>new McpServer per request<br/>17 tools · 4 resources"]
-    LLM["/llm/converse · /llm/tts<br/>(not MCP)"]
-    SIM["/sim/* + SSE<br/>(the simulated world, SIM_ADMIN=1)"]
-    RT["Runtime: mutation lock,<br/>clock ticks → due jobs, idle sweep"]
-    MCP --> RT
-    SIM --> RT
-  end
-
-  subgraph Core["Deterministic core (packages/core, packages/tou-rates)"]
-    PL["planner"]
-    PR["presence"]
-    SV["savings · ledger"]
-    TR["tou-rates: OpenEI normalize, priceAt, slots"]
-  end
-
-  subgraph AWS["AWS (behind env flags)"]
-    BR["Amazon Bedrock<br/>Converse + tool use"]
-    DDB[("DynamoDB<br/>single table OffPeak")]
-    EBS["EventBridge Scheduler<br/>one-time at() schedules"]
-    EX["Executor Lambda"]
-    POL["Amazon Polly (optional)"]
-  end
-
-  OEI["OpenEI Utility Rate Database"]
-
-  MC -- "initialize · tools/list · tools/call" --> MCP
-  UI -- "messages + toolSpecs" --> LLM
-  LLM --> BR
-  LLM --> POL
-  UI -- "SSE snapshots" --> SIM
-  RT --> Core
-  RT -- "STORE=dynamodb" --> DDB
-  RT -- "SCHEDULER=eventbridge" --> EBS --> EX --> DDB
-  TR -. "TARIFF_SOURCE=openei" .-> OEI
+flowchart TB
+    User["Person: voice, text, or demo buttons"] --> Browser
+    subgraph Browser["Browser: Alexa+ simulator"]
+        Host["Conversation host + real MCP client"]
+        View["Echo Show timeline / voice-only view"]
+        Inspector["MCP traffic inspector"]
+        Host --> View
+        Host --> Inspector
+    end
+    Host <-->|"Streamable HTTP /mcp"| Server["Express + MCP server"]
+    Host <-->|"/llm/converse"| Proxy["Server-side LLM proxy"]
+    Proxy --> Mock["Mock intent router"]
+    Proxy -. "optional" .-> Bedrock["Amazon Bedrock Converse"]
+    Server --> Core["Deterministic planning, rules, presence, savings"]
+    Core --> Tariffs["Demo / bundled fixtures / OpenEI"]
+    Core --> Store["Memory / JSON / DynamoDB"]
+    Core --> Jobs["Local scheduler / EventBridge adapter"]
+    Core --> Devices["Simulated devices / Home Assistant"]
+    Clock["Simulated or real clock"] --> Core
+    Server --> Resource["MCP App resource: plan.html"]
+    Resource --> View
 ```
 
-**How a turn works:**
+### What is deliberately separated
 
-1. The browser sends your words and the MCP tool list, mapped to Bedrock `toolSpec`s, to `/llm/converse`.
-2. If the model asks for a tool, **the browser itself calls MCP `tools/call`**. It appends the result and loops, up to 5 tool calls per turn.
-3. The final text is shown as captions and spoken.
-4. UI-bound tool results (`plan_tasks`, `get_home_status`, `get_savings`) render on the Echo Show. The MCP App renders them in an iframe; if it isn't available, the same renderer runs natively.
+1. **Conversation:** the browser owns the tool-use loop. The LLM proxy returns model messages; the browser makes the actual MCP calls.
+2. **Decisions:** the domain core computes the plan, costs, rule checks, and presence decisions. Mock and Bedrock modes use the same tools.
+3. **Effects:** server services persist state, schedule work, send device actions, and append ledger entries.
+4. **Presentation:** tools return short spoken text and structured data; the screen consumes the structured result. An MCP App failure falls back to native rendering.
 
-**Design rules:**
+### MCP implementation details
 
-- **Deterministic core.** Pricing, planning, presence, and savings math are plain, unit-tested TypeScript; the planner runs in under 50 ms. LLMs are used only at the edges: understanding the user, parsing natural-language rules, and phrasing.
-- **Offline fallbacks everywhere.** There's a demo tariff (plus three real bundled tariffs), a simulated home, a simulated clock, a mock LLM, and scripted mode.
+- Protocol **`2025-11-25`**, using **`@modelcontextprotocol/sdk@1.32.1`**.
+- **Stateless Streamable HTTP:** each POST receives a fresh MCP server and transport. Household state lives in the configured store, not in an MCP session.
+- `initialize`, `tools/list`, `tools/call`, and resource requests use the actual SDK and transport.
+- `GET /mcp` and `DELETE /mcp` return **405** by design. A browser address-bar GET is not an MCP health check.
+- MCP Apps integration uses **`@modelcontextprotocol/ext-apps@1.7.5`**, pinned for the SDK used here.
+- Tool inputs and outputs use Zod validation. Speakable domain errors use `isError`, text content, and `_meta["offpeak/error"]`.
+- Runtime mutations are serialized within a server process. This is not a distributed lock across multiple cloud instances.
 
-## MCP details
+See [`mcp/server.ts`](packages/server/src/mcp/server.ts), [`app.ts`](packages/server/src/app.ts), [design decisions](DECISIONS.md), and [SDK friction notes](FRICTION_LOG.md).
 
-- **Protocol:** `2025-11-25` over **Streamable HTTP**.
-  - Uses `@modelcontextprotocol/sdk` **1.32.1**, which keeps the `initialize` handshake that Alexa+ expects.
-  - An integration test asserts the negotiated `protocolVersion === "2025-11-25"`.
-- **Stateless mode:**
-  - `sessionIdGenerator: undefined` and `enableJsonResponse: true`.
-  - A fresh `McpServer` and transport per POST, closed when the response closes.
-  - All state lives in the store. `GET` and `DELETE` on `/mcp` return 405.
-- **Server identity:** name `off-peak`, version `0.1.0`, plus three sentences of `instructions` for routing.
-- **Speakable results:**
-  - Every tool returns `content` text of at most two short sentences: the decision first, at most one money figure, 12-hour times, no IDs, and "demo rate" when using the demo rate.
-  - Every tool also returns `structuredContent` validated against its `outputSchema`.
-  - Domain errors return `isError: true` with speakable text, and machine-readable details in `_meta["offpeak/error"]`. See [FRICTION_LOG.md](FRICTION_LOG.md) for why that isn't in `structuredContent`.
-- **Device references** like "the car", "living room TV", or "fish tank" are resolved fuzzily on the server. If a reference is ambiguous, the tool asks: "Which one did you mean: the kitchen lights, the floor lamp, the desk lamp, or the bedside lamp?"
-- **Security:** CORS is limited to `WEB_ORIGIN`, a host-header check protects against DNS rebinding, every input is validated with Zod, never-off and ask-first rules are enforced server-side, and the sim admin routes are off unless `SIM_ADMIN=1`.
+## MCP tools and resources
 
-| # | Tool | What it does | Annotations |
-|---|---|---|---|
-| 1 | `find_rate_plans` | Residential rate plans for a ZIP (OpenEI), TOU first | read-only, open-world |
-| 2 | `select_rate_plan` | Switch the household's tariff | idempotent |
-| 3 | `get_home_status` | Mode, running, scheduled, price now/next, idle devices | read-only, **UI** |
-| 4 | `get_price_now` | Current price, period, and when it changes | read-only |
-| 5 | `find_cheapest_window` | Cheapest time for one appliance or N minutes vs. now | read-only |
-| 6 | `plan_tasks` | Plan EV/dishwasher/washer/dryer under rules; conflicts come back with priced options | read-only (proposes), **UI** |
-| 7 | `apply_plan` | Schedule a proposed plan | idempotent |
-| 8 | `cancel_plan` | Cancel a plan, a step, or one appliance | destructive, idempotent |
-| 9 | `set_mode` | home / away (+ return time) / sleep / zone (rooms in use) | destructive |
-| 10 | `arriving` | Pre-cool (never during peak) and restore at arrival | idempotent |
-| 11 | `control_device` | On/off/set; never-off devices need confirmation | destructive |
-| 12 | `add_rule` | Natural-language rule → typed rule | — |
-| 13 | `list_rules` / `remove_rule` | Show / delete rules | read-only / destructive |
-| 14 | `explain` | Why something happened or is scheduled | read-only |
-| 15 | `undo` | Restore the exact previous state (one action or a whole mode change) | destructive |
-| 16 | `get_savings` | Dollars saved today/week/month: shift, idle, away | read-only, **UI** |
+### The 17 tools
 
-**Resources:**
+Examples below are JSON arguments to an MCP `tools/call`, not standalone HTTP routes. Use the advertised schemas from `tools/list` for the full contract.
 
-- `offpeak://tariff/current`, `offpeak://household`, and `offpeak://ledger/today` (all `application/json`).
-- `ui://off-peak/plan.html`, an **MCP App** (`text/html;profile=mcp-app`):
-  - Registered with `@modelcontextprotocol/ext-apps`' `registerAppResource`.
-  - Built as a single self-contained file with no network access, rendered purely from `structuredContent`.
-  - Designed for an Echo Show at arm's length: 24 px+ type, high contrast, no hover-only information.
-  - The simulator hosts it with ext-apps' `AppBridge` over `postMessage` (`ui/initialize`, `tool-input`, `tool-result`, `resource-teardown`).
+| Tool | Purpose | Example arguments |
+| --- | --- | --- |
+| `find_rate_plans` | Find residential tariff choices for a ZIP; offline modes return the bundled catalog. | `{"zip":"94110"}` |
+| `select_rate_plan` | Select a rate by identifier or supported name reference. | `{"rateId":"DEMO_TOU"}` |
+| `get_home_status` | Show mode, running/scheduled work, current price, and idle candidates. | `{}` |
+| `get_price_now` | Return the current cents/kWh and next tariff transition. | `{}` |
+| `find_cheapest_window` | Find a cheap run window without scheduling it. | `{"device":"dishwasher","finishBy":"07:00"}` |
+| `plan_tasks` | Propose a coordinated appliance plan with conflicts and rule checks. | `{"tasks":[{"device":"car","targetPercent":80,"finishBy":"07:00"},{"device":"dishwasher","finishBy":"tonight"}]}` |
+| `apply_plan` | Schedule a proposed plan after confirmation; omission selects the latest proposal. | `{}` |
+| `cancel_plan` | Cancel a plan, step, or appliance's scheduled work. | `{"device":"dishwasher"}` |
+| `set_mode` | Change home/away/sleep/active-room behavior. | `{"mode":"away","returnAt":"21:00"}` |
+| `arriving` | Schedule arrival restoration and preconditioning. | `{"eta":"21:00"}` |
+| `control_device` | Explicit on/off, thermostat, or water-heater control. | `{"device":"TV","action":"off"}` |
+| `add_rule` | Parse and save a supported household rule. | `{"text":"Never turn off the fish tank"}` |
+| `list_rules` | Read the current rule set. | `{}` |
+| `remove_rule` | Remove a rule by ID or supported description. | `{"ruleId":"quiet hours"}` |
+| `explain` | Explain a recorded action or scheduled step. | `{"device":"TV"}` |
+| `undo` | Restore recorded previous state for an action or the latest undoable change. | `{}` |
+| `get_savings` | Summarize today/week/month with estimates excluded by default. | `{"period":"week","includeEstimates":false}` |
 
-## AWS services used and how
+Planning and applying are separate. The conversation flow asks for confirmation; the server's `apply_plan` endpoint remains a state-changing tool, so any client you connect must implement its own appropriate confirmation behavior.
 
-| Service | How Off-Peak uses it | Where |
-|---|---|---|
-| **Amazon Bedrock** (Converse + tool use) | The simulated Alexa's reasoning loop: `/llm/converse` sends messages, the verbatim Alexa+ system prompt, and MCP tools as `toolConfig`. Also the second-chance parser for `add_rule` (JSON validated with Zod), after the deterministic parser. | `packages/server/src/llm/routes.ts`, `adapters/ruleParsers.ts` |
-| **AWS Lambda + Function URL** | MCP server (unmodified Express) behind the **AWS Lambda Web Adapter** layer; a second **executor Lambda** runs scheduled jobs. Bundled with Vite SSR, no extra tooling. | `infra/lib/offpeak-stack.ts`, `npm run build:lambda` |
-| **Amazon DynamoDB** | Single table `OffPeak`. The partition key is `HH#<householdId>`. Sort keys are `HOUSEHOLD`, `DEVICE#…`, `RULE#…`, `PLAN#…`, `STEP#…`, `LEDGER#<iso>#<id>`, `TARIFF#…`, and `META#…`. | `adapters/dynamoStore.ts` |
-| **Amazon EventBridge Scheduler** | One-time `at(yyyy-mm-ddThh:mm:ss)` schedules in the household timezone that invoke the executor Lambda, with `ActionAfterCompletion: DELETE`. Used only with `CLOCK=real`; demos use the sim clock and local scheduler. | `adapters/eventBridgeScheduler.ts`, `lambda/executor.ts` |
-| **Amazon Polly** (optional) | Neural TTS for Alexa's voice when `POLLY_VOICE` is set; otherwise the browser voice. | `/llm/tts` |
-| **AWS CDK (TypeScript)** | Table, both Lambdas, Function URL with CORS, scheduler role, and least-privilege IAM. | `infra/` |
+<details>
+<summary><strong>Inspect MCP from the terminal</strong></summary>
 
-**Bedrock model:** `BEDROCK_MODEL_ID` ships empty. Run `npm run bedrock:models`; it lists the ACTIVE text models and inference profiles in `AWS_REGION`. Pick one that supports Converse tool use, then set `LLM_MODE=bedrock` and `BEDROCK_MODEL_ID=…`. With no model configured, Bedrock mode answers "Bedrock mode needs BEDROCK_MODEL_ID…" and scripted mode keeps working.
-
-### Deploy (optional; tear it down after testing)
+With the server running:
 
 ```bash
-aws configure                     # or AWS_PROFILE=…
-npm run build:lambda              # bundles server + executor + fixtures + MCP App into packages/server/dist-lambda
-cd infra && npm install
-npx cdk bootstrap                 # once per account/region
-npx cdk deploy -c webOrigin=http://localhost:5173 -c llmMode=bedrock -c bedrockModelId=<model-id>
-# Point the simulator at the output McpUrl:  VITE_MCP_URL=<McpUrl> npm run dev -w @off-peak/web
-npx cdk destroy
+# Launch the Inspector UI; use Streamable HTTP and http://localhost:8787/mcp.
+npm run inspector
+
+# Or list the tools directly with the pinned CLI.
+npx -y @modelcontextprotocol/inspector@0.22.0 \
+  --cli http://localhost:8787/mcp \
+  --transport http \
+  --method tools/list
 ```
 
-The Lambda Web Adapter layer version is a CDK context value (`lambdaWebAdapterLayerVersion`, default `25`). Check the current version at [awslabs/aws-lambda-web-adapter](https://github.com/awslabs/aws-lambda-web-adapter). `cdk synth` runs offline and is verified. The deployed stack has not been exercised against a live AWS account. The MCP Function URL is unauthenticated (multi-household auth is in [BACKLOG.md](BACKLOG.md)), so destroy the stack after testing.
+A minimal initialization request is:
+
+```bash
+curl -sS http://localhost:8787/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {},
+      "clientInfo": {"name": "readme-check", "version": "1.0.0"}
+    }
+  }'
+```
+
+For an ongoing conversation, use an MCP client to manage initialization, notifications, and subsequent calls. The browser's **MCP Inspector** panel shows the actual messages, IDs, latency, and payload sizes.
+
+</details>
+
+### Resources
+
+| URI | Content |
+| --- | --- |
+| `offpeak://tariff/current` | Current normalized tariff as JSON |
+| `offpeak://household` | Household, zones, devices, rules, and mode as JSON |
+| `offpeak://ledger/today` | Today's action ledger in the household timezone |
+| `ui://off-peak/plan.html` | Single-file MCP App, served as `text/html;profile=mcp-app` |
+
+### Companion HTTP endpoints
+
+These support the simulator and LLM proxy; they are separate from MCP tools.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /health` | Health response and clock state |
+| `GET /llm/config` | Current LLM and speech configuration |
+| `POST /llm/converse` | Next mock or Bedrock model message |
+| `POST /llm/tts` | Optional Polly synthesis |
+| `GET /sim/state` | Full simulator snapshot |
+| `GET /sim/events` | Server-sent snapshot updates |
+| `POST /sim/clock` | Play, pause, change speed, or jump simulated time |
+| `POST /sim/motion` | Change simulated room occupancy/motion |
+| `POST /sim/reset` | Clear stored demo state and restore the seed |
+
+`/sim/*` is mounted only with `SIM_ADMIN=1`; the development runner enables it by default. These routes are administrative and unauthenticated. See [security](#security-and-privacy) before hosting anything.
 
 ## Configuration
 
-Copy `.env.example` to `.env`. Every variable has a working default.
+Copy [`.env.example`](.env.example) to `.env` at the repository root. The server's npm scripts read it, and Vite reads the root file for `VITE_*` values. Restart the relevant process after changing configuration.
+
+### Local defaults
 
 | Variable | Default | Meaning |
-|---|---|---|
-| `PORT` | `8787` | MCP server port |
-| `WEB_ORIGIN` | `http://localhost:5173` | CORS origin for `/mcp`, `/sim`, `/llm` |
-| `VITE_MCP_URL` | `http://localhost:8787/mcp` | Where the simulator connects |
-| `HOUSEHOLD_TZ` | `America/Los_Angeles` | Household timezone (tariff hours are local) |
-| `TARIFF_SOURCE` | `demo` | `demo` (synthetic rate + 3 bundled real plans), `fixture` (default to PG&E E-TOU-C), `openei` (live; falls back to bundled) |
-| `OPENEI_API_KEY` | `DEMO_KEY` when `openei` | [Free key](https://openei.org/services/api/signup); NREL's `DEMO_KEY` works but rate-limits fast |
-| `CLOCK` | `sim` | `sim` (starts paused at the latest weekday 5:30 PM; `SIM_START` overrides) or `real` |
-| `STORE` | `json` | `memory`, `json` (`packages/server/.data/offpeak.json`), `dynamodb` |
-| `SCHEDULER` | `local` | `local` (clock ticks run due jobs) or `eventbridge` (+ `EXECUTOR_LAMBDA_ARN`, `SCHEDULER_ROLE_ARN`) |
-| `DEVICES` | `sim` | `sim` or `homeassistant` (+ `HA_URL`, `HA_TOKEN`, `fixtures/ha-map.json`) |
-| `LLM_MODE` | `mock` | `mock` (zero-cost scripted model) or `bedrock` (+ `AWS_REGION`, `BEDROCK_MODEL_ID`) |
-| `POLLY_VOICE` | — | e.g. `Joanna` to speak with Amazon Polly |
-| `SIM_ADMIN` | `1` in `npm run dev` | Enables `/sim/*` (clock, people, reset, SSE) |
+| --- | --- | --- |
+| `PORT` | `8787` | Express/MCP server port |
+| `WEB_ORIGIN` | `http://localhost:5173` | Exact allowed browser origin for CORS |
+| `VITE_MCP_URL` | `http://localhost:8787/mcp` | Browser's MCP endpoint; also determines the companion API base URL |
+| `HOUSEHOLD_TZ` | `America/Los_Angeles` | Household-local pricing and schedule timezone |
+| `DEMO_ZIP` | Empty | Optional ZIP stored on the seeded household |
+| `TARIFF_SOURCE` | `demo` | `demo`, `fixture`, or `openei` |
+| `CLOCK` | `sim` | Simulated clock or `real` wall clock |
+| `STORE` | `json` locally | `memory`, `json`, or `dynamodb`; Lambda detection changes the default to `dynamodb` |
+| `SCHEDULER` | `local` | Local scheduler or `eventbridge` adapter |
+| `DEVICES` | `sim` | Simulated devices or `homeassistant` gateway |
+| `LLM_MODE` | `mock` | Deterministic mock conversation or `bedrock` |
+| `SIM_ADMIN` | `1` in the example/dev runner | Enables simulator administration and snapshot events |
 
-## Repo layout
+<details>
+<summary><strong>Additional variables and integration settings</strong></summary>
 
+Some options below are supported in code but are not listed in `.env.example`. [`config.ts`](packages/server/src/config.ts) is the configuration reference.
+
+| Variable | Default / requirement | Meaning |
+| --- | --- | --- |
+| `OPENEI_API_KEY` | Empty; live adapter falls back to `DEMO_KEY` | Key for live tariff lookups; shared demo access can be rate-limited |
+| `SIM_START` | Most recent weekday at 5:30 PM | ISO timestamp for a reproducible simulated start; overrides a saved sim time |
+| `DATA_DIR` | `.data`, relative to server working directory | Directory containing `offpeak.json` for JSON persistence |
+| `RULE_PARSER` | `deterministic`, or `bedrock` when `LLM_MODE=bedrock` | Selects the rule parser; the Bedrock parser tries deterministic parsing first |
+| `AWS_REGION` | `us-east-1` | Region used by AWS clients |
+| `BEDROCK_MODEL_ID` | Empty | Accessible Converse tool-use model ID or inference profile ID |
+| `POLLY_VOICE` | Unset | Enables server-side neural Polly speech, for example `Joanna` |
+| `DDB_TABLE` | `OffPeak` | Existing DynamoDB table used by the adapter |
+| `EXECUTOR_LAMBDA_ARN` | Required for `eventbridge` | Existing job executor Lambda target |
+| `SCHEDULER_ROLE_ARN` | Required for `eventbridge` | Existing role allowing Scheduler to invoke the executor |
+| `HA_URL` | Required for `homeassistant` | Home Assistant base URL |
+| `HA_TOKEN` | Required for `homeassistant` | Server-side Home Assistant token |
+| `MCP_ALLOWED_HOSTS` | Localhost names locally | Comma-separated MCP Host-header allowlist; Lambda default is empty, so set it explicitly when needed |
+| `PLAN_APP_HTML` | Built `packages/ui-apps/dist/plan.html` | Override for the server's MCP App HTML file |
+
+Never put secrets in `VITE_*` variables: those values are included in browser code.
+
+</details>
+
+### Persistence and reset
+
+- **`STORE=memory`:** state lasts only for the server process.
+- **`STORE=json`:** JSON snapshots survive restarts. With the standard npm workspace launch, the default file is `packages/server/.data/offpeak.json`.
+- **`STORE=dynamodb`:** uses the configured existing table; see [optional integrations](#optional-integrations).
+
+Changing the fixture, timezone, or tariff-source default does not automatically replace an already persisted household. Use the simulator Reset control when you intentionally want a fresh demo. JSON snapshots are written with an atomic rename; this local store is intended for one server process.
+
+## Optional integrations
+
+The quick start does not provision cloud resources. The options below activate existing adapters or external services; they are not a one-command AWS deployment. Check access, account-specific eligibility, remaining allowances, and service charges before enabling cloud usage.
+
+### OpenEI utility rates
+
+For live ZIP-based tariff discovery, set:
+
+```dotenv
+TARIFF_SOURCE=openei
+OPENEI_API_KEY=your-openei-api-key
 ```
-fixtures/          demo-home.json (20 devices, 6 rooms + whole home), tariffs/ (DEMO_TOU + 3 real OpenEI responses)
-packages/
-  tou-rates/       standalone MIT library: OpenEI client, normalizer, priceAt/slots/describeDay (no deps on the rest)
-  core/            pure domain: types, planner, presence, savings, rule parser, intents, speech helpers
-  server/          MCP server, adapters (stores, devices, tariffs, schedulers), sim admin, LLM proxy, Lambda entry points
-  ui-apps/         MCP App (plan timeline), single-file build; renderer shared with the web client
-  web/             Alexa+ simulator (Vite + React): browser MCP client, Inspector, speech, house/clock/ledger
-infra/             AWS CDK stack (optional)
-scripts/           dev runner, Bedrock model lister, tou-rates exporter
+
+Then ask for rates for a ZIP and select the intended plan. Enabling live lookup alone does not automatically choose a real rate for the household.
+
+The live adapter falls back to bundled tariffs when lookups fail and returns a note describing the fallback. Offline catalogs are examples, not a claim that every bundled tariff applies to the requested ZIP. Bundled responses include PG&E E-TOU-C Region X, PG&E EV2, and SCE TOU-D-4-9PM snapshots; verify the applicable current tariff before making real decisions.
+
+### Amazon Bedrock
+
+1. Configure AWS credentials through the normal AWS SDK credential chain, with permission and account access for your chosen model.
+2. List candidate models and inference profiles in your region:
+
+   ```bash
+   AWS_REGION=us-east-1 npm run bedrock:models
+   ```
+
+3. Confirm a candidate supports **Converse with tool use**; the listing script does not itself prove every model is enabled or tool-compatible.
+4. Set the server configuration and restart:
+
+   ```dotenv
+   LLM_MODE=bedrock
+   AWS_REGION=us-east-1
+   BEDROCK_MODEL_ID=your-enabled-model-or-inference-profile-id
+   ```
+
+No default model is advertised as universally available. The proxy sends requests server-side, keeps AWS credentials out of the browser, and supplies simulated household time to the model. If access fails, use **Brain: Scripted** to continue through real MCP tools without a model request.
+
+### Amazon Polly
+
+Set `POLLY_VOICE=Joanna` to request server-side neural speech using configured AWS credentials. When Polly is unavailable, the client falls back to browser speech. Text interaction remains available independently of either speech path.
+
+### DynamoDB, EventBridge Scheduler, and Lambda
+
+The repository includes the adapters, a scheduled-job executor, a Lambda packaging script, and an [AWS CDK stack](infra/lib/offpeak-stack.ts). The stack provisions the table, server Lambda, executor Lambda, Scheduler role, and MCP Function URL; [deployment](#aws-deployment) is optional and has not been verified against a live AWS account.
+
+| Component | What you must supply |
+| --- | --- |
+| DynamoDB | String partition key `pk` and sort key `sk`; CDK creates the `OffPeak` table and grants the functions access |
+| Scheduler | Executor/role ARNs and schedule permissions; CDK wires these, while the adapter creates one-time schedules during use |
+| Executor | [`lambda/executor.ts`](packages/server/src/lambda/executor.ts), packaged by `npm run build:lambda` and deployed as a second function |
+| Clock and state | CDK uses real time and DynamoDB; simulated time is for the local demonstration |
+| Hosting | CDK provides the MCP Function URL; web hosting and production authentication/access controls remain separate work |
+
+The DynamoDB adapter itself does not create a table; use CDK or supply one independently. EventBridge schedules delete after completion. Stopping the local demo does not remove externally created resources.
+
+### Home Assistant
+
+```dotenv
+DEVICES=homeassistant
+HA_URL=http://your-home-assistant:8123
+HA_TOKEN=your-home-assistant-token
 ```
 
-## Testing
+Review [`fixtures/ha-map.json`](fixtures/ha-map.json) and replace its example entity IDs with the entities you intend to control. Mapped devices send real REST service calls; unmapped devices remain simulated. This is an actuator gateway, not a full live telemetry/occupancy integration. The household model uses Fahrenheit, so verify entity temperature units before thermostat control.
 
-- **Golden scenario** (`packages/core/src/planner.test.ts`, `packages/server/test/scenario.golden.test.ts`), on a weekday at 5:30 PM with the demo rate:
-  - The washer runs now and the dryer 9–10 PM, after the washer and before quiet hours.
-  - The dishwasher and car run overnight in super off-peak, and the car reaches at least 80% by 7 AM.
-  - Load never exceeds 9.6 kW, and the plan saves **$7.74**.
-  - Then time travel to 7 AM: the car is at 80% and the ledger is filled in.
-- **Planner edge cases:** a lower load cap, conflicts with priced options, DST spring-forward, and weekend vs. weekday plans.
-- **Protocol:** the negotiated version is `2025-11-25`; there's a raw JSON-RPC `initialize`, plus checks for CORS, the 405s, all 17 tools with annotations and output schemas, and the MCP App resource.
-- **Scene 2 end to end:** away mode keeps the fridge, router, and aquarium untouched and the washer running. `explain` and `undo` work on the TV. Pre-cooling waits until 9 PM because of peak, and restore brings back only what Off-Peak changed.
-- **Adapters:** DynamoDB single-table round-trips and EventBridge schedule shapes, both with fake clients.
-- **Browser:** the full demo script in mock-LLM and scripted modes was driven in headless Chrome during development.
+Keep `DEVICES=sim` for a hardware-free demonstration.
 
-## Limitations
+## AWS deployment
 
-These are honest, and listed in [BACKLOG.md](BACKLOG.md):
+### What the stack contains
 
-- Tier-1 prices only (no baseline allowances, demand charges, or export credits).
-- No thermal model; setback savings are labeled estimates and excluded from headline numbers by default.
-- The simulator *simulates* Alexa+: hackathon participants can't connect a real Alexa+ device. It is, however, a real MCP client.
-- Bedrock and the AWS deployment are implemented but weren't exercised against a live account during the build (no credentials in the dev environment).
+| Service | Role in Off-Peak |
+| --- | --- |
+| **Lambda + Function URL** | Runs the Express MCP/LLM server through the AWS Lambda Web Adapter |
+| **Executor Lambda** | Handles scheduled job IDs and applies pending work |
+| **DynamoDB** | Stores household, device, rule, plan, job, tariff, metadata, and ledger records |
+| **EventBridge Scheduler** | Invokes the executor using one-time household-local schedules |
+| **Bedrock** | Optional Converse/tool-use conversation and fallback rule parsing |
+| **Polly** | Optional neural text-to-speech |
+| **AWS CDK** | Defines resources, IAM policies, configuration, and outputs |
 
-## Built during the hackathon
+The stack runs with `CLOCK=real`, `STORE=dynamodb`, `SCHEDULER=eventbridge`, and `SIM_ADMIN=0`. Simulator-only house/clock/event panels therefore are not available against the cloud endpoint.
 
-Everything in this repository was written during the Amazon "Build, Ship, Shape" hackathon window (Oct 19–23, 2026), starting from an empty repo. The three OpenEI tariff fixtures are real API responses, retrieved on Oct 19, 2026 and trimmed. See [DECISIONS.md](DECISIONS.md), [FRICTION_LOG.md](FRICTION_LOG.md), [FEEDBACK.md](FEEDBACK.md), and [FEATURE_REQUESTS.md](FEATURE_REQUESTS.md).
+> **Deployment boundary:** the current stack uses **Function URL auth `NONE`**. CORS does not authenticate callers, and the public endpoint includes the LLM proxy. Treat this as a temporary demo stack; add authentication and abuse controls before any public service. Cloud eligibility and costs depend on your account. The local demo remains the default path.
 
-## Open source: `tou-rates`
+### Build and inspect locally
 
-`packages/tou-rates` has zero dependencies on the rest of the repo and its own README and MIT license. `node scripts/export-tou-rates.mjs` produces a standalone repo that installs, tests (21 tests), and builds on its own.
+These commands build the artifacts and synthesize CloudFormation; they do not deploy resources:
+
+```bash
+npm run build:lambda
+cd infra
+npm ci
+npx cdk synth --no-lookups
+```
+
+The Lambda build writes `packages/server/dist-lambda/`, including `main.mjs`, `executor.mjs`, fixtures, the MCP App HTML, and `run.sh`. The CDK stack consumes that bundle. The root `npm run cdk:synth` helper is also available; it installs infrastructure dependencies before synthesis.
+
+Review [`infra/cdk.json`](infra/cdk.json) before deployment:
+
+| Context value | Default | Purpose |
+| --- | --- | --- |
+| `webOrigin` | `http://localhost:5173` | Browser origin allowed by Express/Function URL CORS |
+| `householdTz` | `America/Los_Angeles` | Household timezone |
+| `llmMode` | `mock` | Mock or Bedrock conversation mode |
+| `bedrockModelId` | Empty | Enabled model or inference profile for Bedrock mode |
+| `lambdaWebAdapterLayerVersion` | `25` | Web Adapter layer version; verify availability in your target region |
+
+The adapter version is a project default, not a claim that it is the latest published release. Check the [AWS Lambda Web Adapter repository](https://github.com/awslabs/aws-lambda-web-adapter) when preparing a live deployment.
+
+### Deploy only after account and access checks
+
+Configure your AWS profile/region first. From `infra/`, the local mock conversation is the simplest deployment configuration:
+
+```bash
+# Bootstrap once for the intended account/region; this creates AWS resources.
+npx cdk bootstrap
+
+# Review the change set and deploy the temporary demo stack.
+npx cdk deploy OffPeak \
+  -c webOrigin=http://localhost:5173 \
+  -c llmMode=mock
+```
+
+For Bedrock, replace the last context argument with `-c llmMode=bedrock` and add `-c bedrockModelId=YOUR_ENABLED_MODEL_OR_PROFILE_ID`. Verify the model's access and tool support first. Fixed table/function names mean an existing deployment with the same names can conflict.
+
+The stack outputs **McpUrl**, **TableName**, and **ExecutorArn**. To point a local browser client at the output endpoint, run from the repository root:
+
+```bash
+VITE_MCP_URL="https://YOUR_FUNCTION_URL.lambda-url.YOUR_REGION.on.aws/mcp" \
+  npm run dev -w @off-peak/web
+```
+
+Use the actual `McpUrl` value. The configured `webOrigin` must match the web client's origin exactly.
+
+### Tear down the temporary deployment
+
+From `infra/`:
+
+```bash
+npx cdk destroy OffPeak
+```
+
+**The table uses `RemovalPolicy.DESTROY`: destroying the stack deletes its data.** Back up anything you need first. Review dynamically created EventBridge schedules, retained logs, and CDK bootstrap resources separately; destroying the stack does not guarantee every external or runtime-created resource is removed. The deployment itself has not been live-tested for this README.
+
+## Tariffs and savings
+
+### The synthetic demo tariff
+
+All times are in the household timezone.
+
+| Period | Weekday hours | Price |
+| --- | --- | ---: |
+| Super off-peak | Midnight–6 AM | **24¢/kWh** |
+| Off-peak | 6 AM–4 PM and 9 PM–midnight | **31¢/kWh** |
+| Peak | 4–9 PM | **49¢/kWh** |
+
+On weekends, midnight–6 AM is super off-peak and all remaining hours are off-peak. This tariff is deliberately synthetic and labeled as a demo rate throughout the UI and spoken results.
+
+### How the numbers are formed
+
+```text
+Step cost (cents) = sum(energy used in each price interval × cents/kWh)
+Plan cost         = sum(rounded step costs)
+Shift saving      = max(0, run-now baseline cost − proposed plan cost)
+```
+
+Money is represented as **integer cents**, prices may be fractional **cents/kWh**, energy is **kWh**, and power is **kW** or **W**. A plan that costs more because of household rules reports that condition rather than claiming negative savings. Planned savings become ledger-attributed savings as work executes; a proposal alone is not an executed saving.
+
+Thermostat setback and water-heater savings are modeled estimates. They are reported separately and excluded from the headline total unless `get_savings` receives `includeEstimates: true`. Simulated device power and a chosen tariff are not a billing-grade measurement system.
+
+### `tou-rates`: reusable tariff logic
+
+[`packages/tou-rates`](packages/tou-rates) provides OpenEI fetching, normalization, month/hour schedules, price lookup, transitions, day descriptions, and price slots. It has its own [README](packages/tou-rates/README.md) and [MIT license](packages/tou-rates/LICENSE), plus a standalone export script. This README does not claim a separate npm release or public package repository exists.
+
+For example, from code inside this workspace:
+
+```ts
+import { demoTou, priceAt } from "tou-rates";
+
+const tariff = demoTou("America/Los_Angeles");
+const price = priceAt(tariff, "2026-10-19T17:30:00-07:00");
+
+console.log(price);
+// { centsPerKwh: 49, periodIndex: 2, periodName: "peak" }
+```
+
+Normalization includes tier-1 energy rate plus adjustment and warnings for supported simplifications. Tiered billing beyond the first tier, demand charges, export credits, and inconsistent utility holiday data are outside the current bill model. Fixed charges do not change when an appliance runs.
+
+### Export the standalone library
+
+From the repository root:
+
+```bash
+node scripts/export-tou-rates.mjs
+cd out/tou-rates
+npm install
+npm test
+npm run build
+```
+
+The default output is `out/tou-rates`; an explicit output directory may be passed to the exporter. It copies sources, fixtures, the README, and the license, and rewrites package metadata for built ESM/declaration output. Use a dedicated generated-output directory: rerunning the exporter replaces its exported `src` directory. Publishing that result is a separate action.
+
+## Development and testing
+
+| Command | Purpose |
+| --- | --- |
+| `npm ci` | Install the locked workspace dependencies |
+| `npm run dev` | Build the MCP App and start server + web development processes |
+| `npm test` | Run the Vitest suite once |
+| `npm run test:watch` | Run tests interactively |
+| `npm run lint` | Run strict TypeScript checks across all workspaces; this script is type checking, not ESLint |
+| `npm run build` | Build tariff-package output, the single-file MCP App, and the web client |
+| `npm run build:lambda` | Bundle server/executor and copy runtime assets for CDK |
+| `npm run cdk:synth` | Install infra dependencies and synthesize CloudFormation; no deployment |
+| `npm run inspector` | Start the pinned MCP Inspector |
+| `npm run bedrock:models` | List Bedrock models/profiles with AWS CLI credentials |
+| `npm run start -w @off-peak/server` | Start the TypeScript server without watch mode |
+| `npm run preview -w @off-peak/web` | Preview an already-built web client; the API server must also be running |
+
+### What the tests cover
+
+- Tariff normalization, expiry/ranking, periods, prices, and time handling.
+- Appliance planning, load limits, dependencies, and conflicts.
+- Natural-language time/rule parsing and the scripted intent router.
+- MCP protocol negotiation and tools over real Streamable HTTP.
+- Presence, never-off behavior, arrival, explanations, undo, and savings.
+- Adapter behavior using test doubles and local stores.
+- The complete default planning/execution scenario, including its exact fixture costs.
+
+**Documentation verification on October 19, 2026:** all **117 tests across 10 test files** passed, workspace type checks passed, the production build passed, and the local browser displayed the real MCP App proposal shown above. The Lambda bundle and local CDK synthesis also succeeded; the standalone `tou-rates` export installed, passed its **21 tests**, and built successfully. This is a recorded local check, not a continuous-integration badge or proof of live AWS/device integration.
+
+## Repository map
+
+```text
+AWS-Alexa-Hackathon/
+├── README.md                  Project guide and setup
+├── SPEC.md                    Original product and implementation specification
+├── DECISIONS.md               Technical choices and implementation notes
+├── FRICTION_LOG.md            SDK, tooling, and integration findings
+├── BACKLOG.md                 Deferred scope
+├── DEMO_SCRIPT.md             Scene-by-scene video walkthrough
+├── SUBMISSION.md              Draft hackathon submission and completion items
+├── FEEDBACK.md                Developer feedback
+├── FEATURE_REQUESTS.md        Product/tooling requests
+├── .env.example               Local defaults and integration switches
+├── fixtures/
+│   ├── demo-home.json          Household, devices, and seed rules
+│   ├── ha-map.json             Example Home Assistant entity mappings
+│   └── tariffs/               Synthetic and trimmed real-rate fixtures
+├── packages/
+│   ├── tou-rates/             OpenEI client, tariff normalization, price lookup
+│   ├── core/                  Deterministic domain logic and intent routing
+│   ├── server/                MCP, HTTP proxy, services, stores, adapters, tests
+│   ├── ui-apps/               Single-file MCP App and shared timeline renderer
+│   └── web/                   React Alexa+ simulator and browser MCP client
+├── scripts/
+│   ├── dev.mjs                Development process runner
+│   ├── bedrock-models.mjs      Model/profile listing helper
+│   └── export-tou-rates.mjs    Standalone library exporter
+├── infra/                     Optional AWS CDK stack
+├── docs/assets/               README banner
+├── docs/screenshots/          Actual simulator screenshots
+└── LICENSE                    MIT license
+```
+
+For intent and constraints, read [SPEC.md](SPEC.md). For what changed during implementation, use [DECISIONS.md](DECISIONS.md). For compatibility issues and workarounds, see [FRICTION_LOG.md](FRICTION_LOG.md). Planned files or infrastructure mentioned in the specification are not necessarily implemented; the source tree and this README describe the current project.
+
+For the presentation, see [DEMO_SCRIPT.md](DEMO_SCRIPT.md) and [SUBMISSION.md](SUBMISSION.md). The submission remains a draft with items such as the actual video, team handles, chosen Bedrock model, and standalone library URL to complete. [FEEDBACK.md](FEEDBACK.md) and [FEATURE_REQUESTS.md](FEATURE_REQUESTS.md) collect hackathon developer feedback and requests.
+
+## Security and privacy
+
+This is a **single-household development prototype**, not a hardened public smart-home service.
+
+- **Keep the demo on a trusted local network.** The server does not implement user authentication. CORS and Host-header checks are not authorization, and `app.listen(PORT)` does not explicitly restrict the API to loopback.
+- **Simulator administration is powerful.** `/sim/reset` clears state, and clock/motion endpoints change the world. Disable `SIM_ADMIN` for any non-demo environment and add proper access controls; doing so also disables the current simulator panels/events.
+- **Cloud proxy calls can incur charges.** An exposed `/llm/converse` or `/llm/tts` route could consume the server's credentials. Add authentication, quotas, and abuse controls before hosting.
+- **The CDK Function URL is public by default.** `SIM_ADMIN=0` removes simulator routes, but does not authenticate MCP or the LLM proxy; `MCP_ALLOWED_HOSTS` also defaults to no host check under Lambda unless configured.
+- **Secrets stay server-side.** Keep `.env`, AWS credentials, OpenEI keys, and Home Assistant tokens out of commits and out of `VITE_*` variables. `.env` and local data are ignored by Git.
+- **Real devices require deliberate mapping.** Review Home Assistant entity IDs and supported actions before enabling the gateway.
+- **Guardrails are domain behavior.** Never-off protections constrain automation; explicit protected-device off requests can proceed after confirmation. They are not a substitute for electrical or life-safety controls.
+- **Speech is optional.** Browser microphone input requires permission and may use browser-provider services. Typed input avoids relying on speech recognition.
+
+## Troubleshooting
+
+| Symptom | Check or recovery |
+| --- | --- |
+| TypeScript import/type-stripping errors | Run `node --version`; use Node ≥22.18, matching the root engine requirement. |
+| Web port 5173 is busy | Stop the process using it or start the web workspace with a different Vite `--port`, then update `WEB_ORIGIN` to match. Vite uses a strict port here. |
+| MCP offline / failed to fetch | Check `/health`, server output, `PORT`, `VITE_MCP_URL`, and the exact `WEB_ORIGIN`. Restart after `.env` changes. |
+| Host-header rejection through a proxy | Set `MCP_ALLOWED_HOSTS` to the actual trusted hostnames; do not treat an empty allowlist as authentication. |
+| Console shows `GET /mcp` → 405 | Expected for the stateless MCP transport. The optional GET stream may be attempted by the SDK; verify POST-based initialization/tool calls or `/health` instead. |
+| MCP App is unavailable or the screen is native | Run `npm run build -w @off-peak/ui-apps`. `npm run dev` normally does this first; `?ui=native` is an intentional fallback. |
+| Simulated appliances never advance | The clock starts paused. Use Play or a forward jump; a proposal also needs “Do it” before execution. |
+| Savings differs from the screenshot | Reset, use `DEMO_TOU`, confirm the same initial clock/rules, and distinguish today from week across midnight. |
+| Browser still has old captions after Reset | Reset restores server state; reload the page as well when you need a clean conversation. |
+| No microphone or no audio | Use typed input/example buttons, check browser permissions/support and the Muted control; browser voice availability varies. |
+| Bedrock requests fail | Confirm credentials, model/profile ID, region, model access, and Converse tool support. Switch to scripted mode for the demo. |
+| Tariff lookup returns bundled plans | Offline mode or an OpenEI failure/rate limit triggered fallback; inspect the returned source/note and your key. |
+| Home Assistant mode refuses to start | Supply both `HA_URL` and `HA_TOKEN`, review mappings, and confirm server-side access to Home Assistant. |
+| EventBridge mode refuses to start | Supply executor/role ARNs and existing resources. Use `SCHEDULER=local` for the offline demo. |
+
+## Current boundaries
+
+| Area | Current scope |
+| --- | --- |
+| Alexa+ | Browser simulator with real MCP calls; no native Echo/console connection is included. |
+| Language understanding | Mock/scripted mode supports its deterministic phrase router; it is not a general-purpose language model. Bedrock is optional. |
+| Cloud deployment | CDK, Lambda packaging, and adapters are included; the live deployment and actual AWS permissions have not been verified for this README. |
+| Home Assistant | Optional mapped actions; no full live state synchronization or phone geofencing. |
+| Billing | Time-of-use energy model and labeled estimates; no claim of whole-bill accuracy or guaranteed savings. |
+| Reliability at scale | Local runtime locking and local JSON persistence target one process. Distributed coordination, retries, and production operational controls need further work. |
+| Publishing | `tou-rates` includes standalone export tooling; a separate public release is not asserted here. |
+
+[BACKLOG.md](BACKLOG.md) tracks deferred work, including higher billing tiers, demand charges, solar/export accounting, thermal modeling, learned behavior, multi-household authentication, a mobile app, and geofencing.
+
+## Contributing
+
+1. Read the [specification](SPEC.md), [decisions](DECISIONS.md), and [backlog](BACKLOG.md) before extending scope.
+2. Keep pricing, planning, and savings in the deterministic core; keep external I/O behind server adapters.
+3. Preserve a usable offline path and distinguish simulated values from real integrations.
+4. Add focused tests for behavior changes, especially money, scheduling constraints, and protection/undo behavior.
+5. Run the existing checks before opening a pull request:
+
+   ```bash
+   npm test
+   npm run lint
+   npm run build
+   ```
+
+6. Record significant design choices in `DECISIONS.md` and reproducible SDK/tool surprises in `FRICTION_LOG.md`.
+
+Use [GitHub issues](https://github.com/Darthh/AWS-Alexa-Hackathon/issues) for bugs and concrete improvements. Include the operating mode, relevant non-secret configuration, reproduction steps, expected behavior, and actual behavior.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Released under the **[MIT License](LICENSE)**. Copyright © 2026 Darthh. Third-party services and dependencies retain their own terms and licenses.
