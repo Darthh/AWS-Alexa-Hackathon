@@ -1,11 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { RESOURCE_MIME_TYPE, registerAppResource } from "@modelcontextprotocol/ext-apps/server";
 import { DateTime } from "luxon";
 import type { Runtime } from "../runtime.ts";
 import { PLAN_UI_URI } from "./defineTool.ts";
 
-export const MCP_APP_MIME = "text/html;profile=mcp-app";
+export const MCP_APP_MIME = RESOURCE_MIME_TYPE; // "text/html;profile=mcp-app"
 
 const FALLBACK_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>Off-Peak plan</title></head>
 <body style="font:24px system-ui;background:#0b1220;color:#e6f1ff;padding:24px">
@@ -48,7 +49,8 @@ export function registerResources(server: McpServer, rt: Runtime): void {
       return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(await rt.store.listLedger({ since }), null, 2) }] };
     },
   );
-  server.registerResource(
+  registerAppResource(
+    server,
     "plan-timeline-app",
     PLAN_UI_URI,
     {

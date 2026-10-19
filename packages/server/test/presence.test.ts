@@ -39,7 +39,7 @@ describe("Scene 2: heading out at 6:45 PM until 9", () => {
     expect(r.data.keptOn.map((k: { deviceId: string }) => k.deviceId).sort()).toEqual(["aquarium", "fridge", "router", "washer"]);
     expect(r.data.arrival).toMatchObject({ preconditionAt: "2026-10-19T21:00:00-07:00", restoreAt: "2026-10-19T21:00:00-07:00" });
     expect(r.text).toBe(
-      "Away mode is on: I turned off 10 things, and the fridge, the Wi-Fi router, and the aquarium stay on and the washer keeps going. Cooling starts at 9 PM, when peak ends.",
+      "Away mode is on: I turned off 10 things, but the fridge, Wi-Fi router, and aquarium stay on, and the washer keeps running. Cooling starts at 9 PM, when peak ends.",
     );
     expectSpeakable(r.text);
 
@@ -127,7 +127,7 @@ describe("idle-off, zone mode, sleep, protections, undo", () => {
     expect(off).toEqual(expect.arrayContaining(["tv", "kitchen_lights", "speaker_plug", "fan"]));
     expect(off).not.toContain("pc");
     expect(off).not.toContain("thermostat");
-    expect(r.text).toMatch(/^Okay, just the office: I turned off \d+ things in the other rooms, and the fridge stay/);
+    expect(r.text).toMatch(/^Okay, just the office: I turned off \d+ things in the other rooms, but the fridge stays on\.$/);
     const st = await call(s, "get_home_status");
     expect(st.text).toMatch(/^Only the office is in use/);
   });

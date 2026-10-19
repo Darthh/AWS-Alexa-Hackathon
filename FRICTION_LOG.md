@@ -73,3 +73,34 @@ Issues we hit with SDKs, docs, and tools while building Off-Peak, logged as they
 - Severity: minor
 - Workaround: Bundled three trimmed real responses in `fixtures/tariffs/`; the live adapter falls back to them on any error.
 - Suggestion: Document `DEMO_KEY` and its limits on the URDB API page.
+
+### MCP Apps: View's `ui/initialize` can be lost if the host connects on iframe `load`
+- Task attempted: Host `ui://off-peak/plan.html` (single-file Vite build) in an iframe with ext-apps' `AppBridge`, following the documented flow (set the iframe source, then `bridge.connect(new PostMessageTransport(...))`).
+- Steps taken: Set `iframe.srcdoc`, connected the bridge in the iframe's `load` handler.
+- Expected: `bridge.oninitialized` fires.
+- Actual: It never fired. The inlined app parses and sends `ui/initialize` before `load`, so the host wasn't listening yet and the request was dropped; no retry. Our host fell back to native rendering after 4 s.
+- Severity: major
+- Workaround: Create and `connect()` the AppBridge to `iframe.contentWindow` first, then set `srcdoc` (the WindowProxy stays the same across the navigation).
+- Suggestion: Document "connect before loading the View" in the AppBridge example, or have `App.connect()` retry `ui/initialize` until answered.
+
+### MCP Apps: `AppBridge.setHostContext()` before `connect()` throws "Not connected"
+- Task attempted: Give the View an initial theme/display mode.
+- Steps taken: `bridge.setHostContext({...})` right after `new AppBridge(...)`.
+- Expected: Context is stored and delivered in the `ui/initialize` result.
+- Actual: It immediately sends `ui/notifications/host-context-changed`, which rejects with an unhandled "Not connected".
+- Severity: minor
+- Workaround: Pass `{ hostContext }` as the 4th constructor argument (`HostOptions`).
+- Suggestion: Make `setHostContext` buffer until connected, or say so in its doc comment.
+
+### MCP Apps bundle size for a tiny View
+- Task attempted: Single-file MCP App (one timeline view, vanilla DOM).
+- Actual: 460 KB (113 KB gzip) because `App` pulls in the SDK's `Protocol` and Zod. Fine on a laptop; heavy for an Echo Show-class device.
+- Severity: minor
+- Suggestion: A slim postMessage-only View client (no Zod validation) for constrained hosts.
+
+### Stateless Streamable HTTP: browser console shows a 405 on every connect
+- Task attempted: Browser MCP client against a stateless server (`sessionIdGenerator: undefined`).
+- Actual: After `initialize`, the SDK client opens the optional standalone GET SSE stream; the server answers 405 (correct per spec) and the SDK handles it, but Chrome logs "Failed to load resource: 405" on every page load, which looks like a bug during a demo.
+- Severity: minor
+- Workaround: None needed; documented in the README.
+- Suggestion: Let clients skip the standalone GET when the server signals statelessness (e.g. no `mcp-session-id`), or an option to disable it.

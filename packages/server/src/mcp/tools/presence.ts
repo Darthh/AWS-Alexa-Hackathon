@@ -10,6 +10,12 @@ function lower(names: string[]): string[] {
   return names.map((n) => the(n));
 }
 
+/** "the fridge stays on" / "the fridge, Wi-Fi router, and aquarium stay on". */
+function staysOn(names: string[]): string {
+  const items = names.map((n, i) => (i === 0 ? the(n) : the(n).slice(4)));
+  return `${joinAnd(items)} ${names.length === 1 ? "stays" : "stay"} on`;
+}
+
 export const setModeTool = defineTool({
   name: "set_mode",
   title: "Set home mode",
@@ -55,11 +61,11 @@ export const setModeTool = defineTool({
             ? `Okay, just the ${joinAnd(r.activeZones.map((z) => z.toLowerCase()))}: I turned off ${offs} ${offs === 1 ? "thing" : "things"} in the other rooms`
             : `Good night: I turned off ${offs} ${offs === 1 ? "thing" : "things"}, and noisy appliances will wait for morning`;
       const kept = [
-        protectedOn.length ? `${joinAnd(lower(protectedOn))} stay on` : "",
-        busy.length ? `${joinAnd(lower(busy))} keeps going` : "",
+        protectedOn.length ? staysOn(protectedOn) : "",
+        busy.length ? `${joinAnd(lower(busy))} ${busy.length === 1 ? "keeps" : "keep"} running` : "",
       ].filter(Boolean);
       const second = r.arrival ? ` ${r.arrival.note}` : r.needsConfirmation.length ? ` ${joinAnd(lower(r.needsConfirmation.map((n) => n.name)))} need your okay first.` : "";
-      text = `${lead}${kept.length ? `, and ${joinAnd(kept)}` : ""}.${second}`;
+      text = `${lead}${kept.length ? `, but ${kept.join(", and ")}` : ""}.${second}`;
     }
     return { text, data: r };
   },

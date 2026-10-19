@@ -3,5 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
-  "type": "module"
+  "type": "module",
+  "exports": {
+    "./timeline": "./src/timeline.ts",
+    "./timeline.css": "./src/timeline.css"
+  },
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "1.7.5",
+    "@modelcontextprotocol/sdk": "1.32.1"
+  },
+  "devDependencies": {
+    "vite": "8.3.4",
+    "vite-plugin-singlefile": "2.3.4"
+  }
 }

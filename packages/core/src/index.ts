@@ -9,3 +9,4 @@ export * from "./presence.ts";
 export * from "./savings.ts";
 export * from "./ruleParser.ts";
 export * from "./speech.ts";
+export * from "./intents.ts";

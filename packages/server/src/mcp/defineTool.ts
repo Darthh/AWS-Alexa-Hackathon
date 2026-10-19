@@ -1,11 +1,13 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
+import { RESOURCE_URI_META_KEY } from "@modelcontextprotocol/ext-apps/server";
 import { OffPeakError } from "@off-peak/core";
 import { z as zod, type z } from "zod";
 import { log, logError } from "../log.ts";
 import type { Runtime } from "../runtime.ts";
 
 export const PLAN_UI_URI = "ui://off-peak/plan.html";
+
 
 export interface ToolOutput<T> {
   /** Speakable: ≤ 2 short sentences, decision first, ≤ 1 money figure, 12-hour times, no IDs. */
@@ -59,7 +61,7 @@ export function registerTool(server: McpServer, rt: Runtime, def: ToolDef): void
       inputSchema: def.input,
       outputSchema: def.output,
       annotations: { title: def.title, ...def.annotations },
-      _meta: def.ui ? { ui: { resourceUri: PLAN_UI_URI }, "ui/resourceUri": PLAN_UI_URI } : undefined,
+      _meta: def.ui ? { ui: { resourceUri: PLAN_UI_URI }, [RESOURCE_URI_META_KEY]: PLAN_UI_URI } : undefined,
     },
     async (args: Record<string, unknown>): Promise<CallToolResult> => {
       const started = performance.now();

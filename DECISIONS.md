@@ -33,3 +33,13 @@ One line per decision, newest at the bottom of each section.
 - 2026-10-19 · Shift savings are attributed per executed step (task baseline − task plan cost, by kWh share), so the ledger fills in as the night runs.
 - 2026-10-19 · Estimated savings (excluded from headline unless `includeEstimates`): cooling setback 0.05 kWh per °F per hour (≈3%/°F of a 3.5 kW AC at ~50% duty); water heater eco 0.1 kWh/h. Idle/away savings use the device's measured draw before it was switched off × slot price until it came back on.
 - 2026-10-19 · Washer cycle is 90 min (spec seed says 60) so Scene 2 at 6:45 PM has a running washer that away mode must not interrupt; golden-scenario costs and savings are unchanged ($7.74).
+
+## Web client & LLM
+- 2026-10-19 · `BEDROCK_MODEL_ID` ships empty: no AWS credentials were available to verify which models this account/region can call through Converse. `npm run bedrock:models` lists ACTIVE models + inference profiles; the team picks one with Converse tool use and records it here. Until then Bedrock mode returns a speakable "set BEDROCK_MODEL_ID" error. **TODO(team): record the chosen model ID.**
+- 2026-10-19 · The Converse call sends no `temperature`/`topP` (current Claude models reject sampling parameters); `maxTokens: 1024`.
+- 2026-10-19 · System prompt is the SPEC §12 text verbatim as the first system block; a second block carries the sim-clock local time so "tonight" / "by 7" resolve against the simulated home, not the laptop clock.
+- 2026-10-19 · `LLM_MODE=mock` and `?mode=scripted` share one regex intent router (`core/intents.ts`), so the mock LLM and the scripted fallback behave identically on the demo lines.
+- 2026-10-19 · Tool results go back to the model as text + JSON with the `timeline` stripped (screens need it; the model doesn't).
+- 2026-10-19 · Speech never blocks the next turn; a new utterance interrupts it. Polly is used only when `POLLY_VOICE` is set, else `speechSynthesis`.
+- 2026-10-19 · After a turn with no UI-bound tool result, the host refreshes the Echo Show with `get_home_status` (what a real screen device would show).
+- 2026-10-19 · The MCP App is hosted with ext-apps' `AppBridge` in a `sandbox="allow-scripts"` srcdoc iframe; on any failure within 4 s the web client renders the same view natively from `structuredContent` (shared renderer in `packages/ui-apps/src/timeline.ts`).
