@@ -7,7 +7,12 @@ import { resolve } from "node:path";
 const base =
   process.env.DEMO_URL ?? "https://offpeak.patrickvaldivia123.workers.dev";
 mkdirSync("out/recording", { recursive: true });
-const browser = await chromium.launch({ channel: "chrome", headless: true });
+// Installed Chrome by default; PW_CHROMIUM_PATH points at any other Chromium build.
+const browser = await chromium.launch(
+  process.env.PW_CHROMIUM_PATH
+    ? { executablePath: process.env.PW_CHROMIUM_PATH, headless: true, args: ["--no-sandbox", "--disable-gpu"] }
+    : { channel: "chrome", headless: true },
+);
 const context = await browser.newContext({
   viewport: { width: 1600, height: 1000 },
   recordVideo: { dir: "out/recording", size: { width: 1600, height: 1000 } },
@@ -68,7 +73,7 @@ const caption = async (title, detail, seconds = 9) => {
 
 try {
   await page.goto(base);
-  await page.getByText("MCP connected · 17 tools").waitFor();
+  await page.getByText("MCP 2025-11-25 · Streamable HTTP · 17 tools").waitFor();
   await page.getByRole("button", { name: "Voice", exact: true }).click();
   const guide = page.getByRole("region", { name: "Guided judge walkthrough" });
   await guide.getByRole("button", { name: "Start guided demo" }).click();
@@ -135,7 +140,7 @@ try {
   await page.getByRole("button", { name: "Large screen", exact: true }).click();
   await caption(
     "At 7 AM, the car is at 80% and the jobs have executed.",
-    "The week view includes both sides of midnight. Appliance load shifting and room savings are shown separately; all amounts use the synthetic demo rate.",
+    "Today's savings count the whole overnight schedule, so the morning answer matches the plan. Load shifting and room savings are shown separately; all amounts use the synthetic demo rate.",
     11,
   );
   await page

@@ -363,7 +363,7 @@ export async function executeJob(
         deviceId: device.id,
         source: "plan",
         action: "held",
-        reason: `Held ${device.name.toLowerCase()} because sleep mode keeps noisy appliances off.`,
+        reason: "sleep mode keeps noisy appliances off",
         meta: { planId: plan.id, stepId: step.id },
       });
       return;

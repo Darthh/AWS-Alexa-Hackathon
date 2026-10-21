@@ -150,3 +150,39 @@ Issues we hit with SDKs, docs, and tools while building Off-Peak, logged as they
 - Severity: major
 - Workaround: A dedicated Vite worker mode and a build check; live browser tests use the deployed same-origin endpoint.
 - Suggestion: Deployment templates should separate development endpoint overrides from hosted defaults.
+
+### SDK v1 speaks raw input-validation errors, with no public hook to change them
+- Task attempted: Keep every tool reply speakable on a voice device, including when the model sends arguments that fail the tool's input schema (for example `find_rate_plans` with `zip: "abc"`).
+- Steps taken: Called the tool over Streamable HTTP with bad arguments and read the `CallToolResult` the SDK returned; looked for a hook in `McpServer` (`registerTool` options, server options, error callbacks).
+- Expected: A way to shape validation failures (or at least a structured error code) so a host can say something sensible.
+- Actual: `McpServer` validates input before our handler runs and returns `isError: true` with the text `MCP error -32602: Input validation error: Invalid arguments for tool find_rate_plans: Invalid string: must match pattern /^\d{5}$/ at zip`. A speaker would read that aloud. The method that builds it (`createToolError`) is TypeScript-private, and no structured error code is attached.
+- Severity: major (for voice-first hosts such as Alexa+)
+- Workaround: Override the instance's `createToolError` right after registering tools: map the tool name to a short spoken prompt ("I need a five-digit ZIP code to look up rate plans."), keep the raw message in `_meta`, and log `{ tool, ok: false, code: "invalid_input" }`. Covered by `packages/server/test/refinements.test.ts`.
+- Suggestion: A public `onToolInputError(tool, issues) => CallToolResult` option on `McpServer` (or `registerTool`), and a machine-readable code on the default error result.
+
+### Node 22 `--watch` crashes when `--env-file-if-exists` points at a missing file
+- Task attempted: Run `npm run dev` on a fresh clone without copying `.env.example` (the "zero keys, one command" path judges are likely to take).
+- Steps taken: `git clone … && npm ci && npm run dev` on Node 22.22.
+- Expected: `--env-file-if-exists` skips the missing file, as its name says.
+- Actual: The server process exits with `ENOENT: no such file or directory, watch '/…/.env'` from Node's watch-mode file watcher, which tries to watch the env file even though it doesn't exist. The web client starts but shows "MCP offline". It never showed up for us locally because we all had a `.env`.
+- Severity: major (breaks the documented quick start)
+- Workaround: Drop the flag; load the repo-root `.env` in code (`packages/server/src/env.ts`, `util.parseEnv`, existing variables win) as the first import of `main.ts`.
+- Suggestion: Node: don't add a missing `--env-file-if-exists` file to the watch list. Projects: test the quick start from a clean clone in CI.
+
+### Viewport media queries behave differently in the MCP App iframe and in the native fallback
+- Task attempted: Render the plan timeline at Echo Show size (a 960×600 screen, type ≥ 24 px) both as the MCP App iframe and natively in the console when the iframe is unavailable.
+- Steps taken: Put the shared renderer inside a scaled 960×600 device canvas and opened the console on a 390 px phone.
+- Expected: Both paths look the same, since both render into a 960 px-wide screen.
+- Actual: Inside the iframe, `@media (max-width: 850px)` saw the iframe's 960 px viewport. In the native path it saw the 390 px browser window and switched to the compact layout (8–15 px type) inside the device screen.
+- Severity: minor
+- Workaround: Use container queries (`container-type: inline-size` on the iframe `body` and on the console's screen body) so the compact rules key off the box the app is rendered into.
+- Suggestion: MCP Apps examples for embeddable views could use container queries by default, since a View can't know whether it is in an iframe or rendered inline.
+
+### Playwright video capture requires its own FFmpeg build
+- Task attempted: Record the captioned demo video (`npm run record:demo`) in a network-restricted environment.
+- Steps taken: Pointed Playwright at an existing Chromium build; system FFmpeg (with libvpx) was already installed.
+- Expected: Video recording uses the installed FFmpeg or reports how to point at one.
+- Actual: `newPage` fails with "Executable doesn't exist at …/ffmpeg-1013/ffmpeg-linux" and only suggests `npx playwright install ffmpeg`, which needs the Playwright CDN.
+- Severity: minor
+- Workaround: `PW_CHROMIUM_PATH` selects any Chromium for tests and the recorder; for video, place a link to the system `ffmpeg` at the expected path under `PLAYWRIGHT_BROWSERS_PATH`.
+- Suggestion: An environment variable for the FFmpeg path, matching `executablePath` for browsers.

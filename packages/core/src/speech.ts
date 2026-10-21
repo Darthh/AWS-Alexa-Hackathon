@@ -1,5 +1,5 @@
 import { toDateTime } from "tou-rates";
-import { capitalize, dollars, joinAnd, joinOr, speakTime } from "./format.ts";
+import { capitalize, joinAnd, joinOr, lowerFirst, money, speakTime, the } from "./format.ts";
 import { HOUR, MINUTE, ms } from "./time.ts";
 import type { Household, Plan } from "./types.ts";
 
@@ -8,7 +8,7 @@ export function spokenName(h: Household, deviceId: string): string {
   const d = h.devices.find((x) => x.id === deviceId);
   if (!d) return "that appliance";
   if (d.kind === "ev_charger") return "the car";
-  return `the ${d.name.toLowerCase()}`;
+  return the(d.name);
 }
 
 /** "now", "at 9 PM", "overnight", "tomorrow at 8 AM". */
@@ -36,14 +36,18 @@ export function describePlan(plan: Plan, h: Household, now: number, opts: { demo
   const demo = opts.demoRate ? " on the demo rate" : "";
   let first: string;
   if (parts.length === 0) first = "There's nothing to schedule right now";
-  else if (plan.savingsCents > 0) first = `Here's the plan: ${joinAnd(parts)}, about ${dollars(plan.savingsCents)} cheaper than running it all now${demo}`;
+  else if (plan.savingsCents > 0) first = `Here's the plan: ${joinAnd(parts)}, about ${money(plan.savingsCents)} cheaper than running it all now${demo}`;
   else first = `Here's the plan: ${joinAnd(parts)}, which is already the cheapest way to do it${demo}`;
 
   const conflict = plan.conflicts[0];
   if (conflict) {
-    const opts2 = conflict.options.slice(0, 2).map((o) => { const l = o.label.replace(/ \(\+\$[\d.]+\)$/, ""); return l.charAt(0).toLowerCase() + l.slice(1); });
+    const opts2 = conflict.options.slice(0, 2).map((o) => lowerFirst(o.label.replace(/ \(\+\$[\d.]+\)$/, "")));
+    // "finish by 7:30 PM instead, or by 2 AM tomorrow" rather than repeating "finish by … instead".
+    if (opts2.length === 2 && /^finish by /.test(opts2[0]!) && /^finish by /.test(opts2[1]!)) {
+      opts2[1] = opts2[1]!.replace(/^finish /, "").replace(/ instead$/, "");
+    }
     const question = opts2.length ? ` Should I ${joinOr(opts2)}?` : "";
-    const lead = parts.length ? `${first}, but ${conflict.message.charAt(0).toLowerCase()}${conflict.message.slice(1)}` : conflict.message;
+    const lead = parts.length ? `${first}, but ${lowerFirst(conflict.message)}` : conflict.message;
     return `${lead}${question}`;
   }
   return parts.length ? `${first}. Should I go ahead?` : `${first}.`;

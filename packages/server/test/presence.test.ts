@@ -53,7 +53,7 @@ describe("Scene 2: heading out at 6:45 PM until 9", () => {
 
   it("explains why the TV turned off, and undo turns just the TV back on", async () => {
     const e = await call(s, "explain", { device: "TV" });
-    expect(e.text).toBe("The TV turned off at 6:45 PM because you left home and it was drawing 15 W on standby. Say undo to reverse it.");
+    expect(e.text).toBe("The TV turned off at 6:45 PM because you left home and it was drawing 15 watts on standby. Want me to turn it back on?");
     tvEntry = e.data.entry.id;
     const u = await call(s, "undo", { actionId: tvEntry });
     expect(u.text).toBe("Done, the TV is back the way it was.");
@@ -198,7 +198,7 @@ describe("rules", () => {
     expectSpeakable(list.text);
 
     const rm = await call(s, "remove_rule", { ruleId: "quiet hours" });
-    expect(rm.text).toBe("Okay, I removed the rule: quiet hours 9:30 PM–7 AM.");
+    expect(rm.text).toBe("Okay, I removed the rule: quiet hours 9:30 PM to 7 AM.");
     const bad = await call(s, "add_rule", { text: "make me a sandwich" });
     expect(bad.isError).toBe(true);
     expect(bad.text).toMatch(/^I didn't catch that rule/);

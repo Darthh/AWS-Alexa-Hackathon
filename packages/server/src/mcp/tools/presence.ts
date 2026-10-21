@@ -1,4 +1,4 @@
-import { joinAnd, speakTime, the } from "@off-peak/core";
+import { capitalize, joinAnd, speakTime, the } from "@off-peak/core";
 import { z } from "zod";
 import { arriving, setMode } from "../../services/presence.ts";
 import { defineTool } from "../defineTool.ts";
@@ -48,23 +48,30 @@ export const setModeTool = defineTool({
     const offs = r.actions.filter((a) => a.action === "off").length;
     const protectedOn = r.keptOn.filter((k) => !/cycle|charging/.test(k.reason)).map((k) => k.name);
     const busy = r.keptOn.filter((k) => /cycle|charging/.test(k.reason)).map((k) => k.name);
+    const asking = lower(r.needsConfirmation.map((n) => n.name));
+    // Rules > presence: a device that must be asked about gets the question instead of the arrival note
+    // (the arrival is still scheduled and returned in structuredContent).
+    const askQuestion = asking.length
+      ? `${capitalize(joinAnd(asking))} ${asking.length > 1 ? "are" : "is"} set to ask first; should I turn ${asking.length > 1 ? "them" : "it"} off too?`
+      : "";
     let text: string;
     if (r.mode === "home") {
       text = r.restored.length ? `Welcome home: I turned ${r.restored.length} ${r.restored.length === 1 ? "thing" : "things"} back on the way you left ${r.restored.length === 1 ? "it" : "them"}.` : "Welcome home; there was nothing to turn back on.";
-    } else if (r.needsConfirmation.length && r.actions.length === 0) {
-      text = `Before I switch anything off: ${joinAnd(lower(r.needsConfirmation.map((n) => n.name)))} ${r.needsConfirmation.length > 1 ? "are" : "is"} set to ask first. Should I go ahead?`;
+    } else if (asking.length && r.actions.length === 0) {
+      text = `Before I switch anything off: ${joinAnd(asking)} ${asking.length > 1 ? "are" : "is"} set to ask first. Should I go ahead?`;
     } else {
+      const things = (n: number) => `${n} ${n === 1 ? "thing" : "things"}`;
       const lead =
         r.mode === "away"
-          ? `Away mode is on: I turned off ${offs} ${offs === 1 ? "thing" : "things"}`
+          ? `Away mode is on: I turned off ${things(offs)}`
           : r.mode === "zone"
-            ? `Okay, just the ${joinAnd(r.activeZones.map((z) => z.toLowerCase()))}: I turned off ${offs} ${offs === 1 ? "thing" : "things"} in the other rooms`
-            : `Good night: I turned off ${offs} ${offs === 1 ? "thing" : "things"}, and noisy appliances will wait for morning`;
+            ? `Okay, just the ${joinAnd(r.activeZones.map((z) => z.toLowerCase()))}: I turned off ${things(offs)} in the other rooms`
+            : `Good night: I turned off ${things(offs)}, and noisy appliances will wait for morning`;
       const kept = [
         protectedOn.length ? staysOn(protectedOn) : "",
         busy.length ? `${joinAnd(lower(busy))} ${busy.length === 1 ? "keeps" : "keep"} running` : "",
       ].filter(Boolean);
-      const second = r.arrival ? ` ${r.arrival.note}` : r.needsConfirmation.length ? ` ${joinAnd(lower(r.needsConfirmation.map((n) => n.name)))} need your okay first.` : "";
+      const second = askQuestion ? ` ${askQuestion}` : r.arrival ? ` ${r.arrival.note}` : "";
       text = `${lead}${kept.length ? `, but ${kept.join(", and ")}` : ""}.${second}`;
     }
     return { text, data: r };
@@ -90,7 +97,7 @@ export const arrivingTool = defineTool({
     rt.changed("arriving");
     const tz = rt.timezone;
     const note = r.notes.split(". ")[0]!.replace(/\.$/, "");
-    const text = `${note}. Everything else comes back on at ${speakTime(r.restoreAt, tz)}.`;
-    return { text, data: r };
+    const text = r.willRestore ? `${note}. Everything else comes back on at ${speakTime(r.restoreAt, tz)}.` : `${note}.`;
+    return { text, data: { restoreAt: r.restoreAt, preconditionAt: r.preconditionAt, notes: r.notes } };
   },
 });

@@ -109,6 +109,15 @@ export function routeUtterance(utterance: string, ctx: IntentContext = {}): Inte
   const zone = /\b(?:just me|only me|only using|just using|i'm only in|only in|i'm working) (?:in )?(?:the )?([a-z ]+?)(?: room)?(?: now| tonight| today)?$/.exec(t);
   if (zone) return one("zone", "set_mode", { mode: "zone", activeZones: [zone[1]!.trim()] });
 
+  // Standing rules phrased as "never/don't run X after T" (otherwise they'd look like a planning request)
+  if (/^(never|don't|do not|no) (ever )?(run|running|start|starting|use|using)\b/.test(t) && /\b(after|past|later than)\b/.test(t) && !/\b(until|till|before)\b/.test(t)) {
+    return one("add_rule", "add_rule", { text: utterance.trim() });
+  }
+  if (/^(remove|drop|delete|forget) (the |my )?.*\brule\b|^(remove|drop|delete) (the |my )?(load limit|quiet hours)/.test(t)) {
+    const ref = t.replace(/^(remove|drop|delete|forget) (the |my )?/, "").replace(/\brule\b/, "").trim();
+    return one("remove_rule", "remove_rule", { ruleId: ref || "rule" });
+  }
+
   // Planning (before rules: "nothing loud after 10" often rides along)
   if (/\b(cheapest|best time|when should i|when's the cheapest|when is the cheapest)\b/.test(t)) {
     // "Run it when cheapest" requests a proposal; "When is cheapest?" only asks for information.

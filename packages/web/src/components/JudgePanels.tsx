@@ -45,10 +45,10 @@ export const TOUR = [
   {
     title: "See the result",
     detail:
-      "Jump to 7 AM. The EV reaches 80%; ask for the week total to include both sides of midnight.",
+      "Jump to 7 AM. The EV reaches 80%; today's savings count the whole overnight schedule, so they match the plan.",
     action: "6. Finish the night",
     jump: "07:00",
-    utterance: "How much did Off-Peak save me this week?",
+    utterance: "How much did Off-Peak save me today?",
   },
   {
     title: "See one-room mode",

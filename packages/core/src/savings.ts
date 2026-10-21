@@ -32,7 +32,12 @@ export interface SavingsSummary {
   topWins: SavingsWin[];
   /** Live value per ledger entry (shift entries use their recorded share). */
   byEntry: Record<string, Cents>;
+  /** The period also counts earlier steps of a plan that finished in it (last night's washer for this morning's plan). */
+  includesEarlierPlanSteps: boolean;
 }
+
+const isShift = (e: LedgerEntry) => e.source === "plan" && (e.action === "run" || e.action === "charge") && e.estSavedCents > 0;
+const planIdOf = (e: LedgerEntry): string | undefined => (typeof e.meta?.planId === "string" ? e.meta.planId : undefined);
 
 export function periodStart(period: SavingsPeriod, now: number, timezone: string): number {
   const local = DateTime.fromMillis(now, { zone: timezone });
@@ -80,12 +85,24 @@ export function computeSavings(
   const wins: SavingsWin[] = [];
   const byEntry: Record<string, Cents> = {};
   const name = (id?: string) => h.devices.find((d) => d.id === id)?.name ?? "Something";
+  // A plan is one decision: when any of its steps ran in the period, the period includes the whole plan,
+  // so "how much did I save today?" at 7 AM matches what the plan promised last night (and a plan that
+  // straddles the start of a week or month counts the same way, so "today" never exceeds "this week").
+  const plansToday = new Set(
+    ledger.filter((e) => isShift(e) && ms(e.at) >= from && ms(e.at) <= now).map(planIdOf).filter((x): x is string => Boolean(x)),
+  );
+  let includesEarlierPlanSteps = false;
 
   for (const e of ledger) {
     const at = ms(e.at);
-    if (e.source === "plan" && (e.action === "run" || e.action === "charge") && e.estSavedCents > 0) {
+    if (isShift(e)) {
       byEntry[e.id] = e.estSavedCents;
-      if (at < from || at > now) continue;
+      if (at > now) continue;
+      if (at < from) {
+        const id = planIdOf(e);
+        if (!id || !plansToday.has(id)) continue;
+        includesEarlierPlanSteps = true;
+      }
       bySource.shift += e.estSavedCents;
       const d = h.devices.find((x) => x.id === e.deviceId);
       wins.push({ entryId: e.id, deviceId: e.deviceId, label: d?.battery ? "Charging the car off-peak" : `Running ${name(e.deviceId).toLowerCase()} off-peak`, cents: e.estSavedCents, estimate: false });
@@ -150,5 +167,6 @@ export function computeSavings(
     includeEstimates,
     topWins: [...merged.values()].map((w) => ({ ...w, cents: round(w.cents) })).filter((w) => w.cents > 0).sort((a, b) => b.cents - a.cents).slice(0, 3),
     byEntry,
+    includesEarlierPlanSteps,
   };
 }

@@ -6,7 +6,7 @@ const shotDir = process.env.UPDATE_SCREENSHOTS ? "docs/screenshots" : null;
 
 async function ready(page: Page, query = "") {
   await page.goto(`/${query}`);
-  await expect(page.getByText("MCP connected · 17 tools")).toBeVisible();
+  await expect(page.getByText("MCP 2025-11-25 · Streamable HTTP · 17 tools")).toBeVisible();
   await expect(page.locator(".zones .dev")).toHaveCount(20);
   // Keep automated browser runs silent.
   await page.getByRole("button", { name: "Voice", exact: true }).click();
@@ -171,7 +171,7 @@ test("scripted/native fallback, typed messages, persistence, and visitor isolati
   await ask(page, "Do it.");
   const state = await (await page.request.get("/sim/state")).json();
   await page.reload();
-  await expect(page.getByText("MCP connected · 17 tools")).toBeVisible();
+  await expect(page.getByText("MCP 2025-11-25 · Streamable HTTP · 17 tools")).toBeVisible();
   const persisted = await (await page.request.get("/sim/state")).json();
   expect(persisted.steps.length).toBe(state.steps.length);
   await page.getByLabel("Message to Alexa").fill("What's the price right now?");

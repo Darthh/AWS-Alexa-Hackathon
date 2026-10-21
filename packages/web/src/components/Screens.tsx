@@ -5,7 +5,7 @@ import {
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import "@off-peak/ui-apps/timeline.css";
 import { renderView } from "@off-peak/ui-apps/timeline";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { McpConn } from "../lib/mcp.ts";
 
 export interface ScreenPayload {
@@ -13,6 +13,43 @@ export interface ScreenPayload {
   tool: string;
   args: Record<string, unknown>;
   result: CallToolResult;
+}
+
+/** Echo Show 8's logical display: 1280×800 physical at 4:3 density → 960×600 CSS px (16:10). */
+export const ECHO_W = 960;
+export const ECHO_H = 600;
+
+/**
+ * The Echo Show screen, authored at the device's own resolution and scaled to fit the console, so the
+ * MCP App and captions render exactly as they would at arm's length on the device (≥ 24 px type).
+ */
+export function EchoShowFrame({ children, fill }: { children: ReactNode; fill: boolean }) {
+  const outer = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.62);
+  useLayoutEffect(() => {
+    const el = outer.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.clientWidth;
+      const h = fill ? el.clientHeight : Infinity;
+      if (w > 0) setScale(Math.min(w / ECHO_W, h / ECHO_H));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fill]);
+  return (
+    <div ref={outer} className={`echo-outer ${fill ? "fill" : ""}`} style={fill ? undefined : { height: ECHO_H * scale }}>
+      <div
+        className="echo-canvas"
+        data-theme="dark"
+        style={{ width: ECHO_W, height: ECHO_H, transform: `scale(${scale})`, left: fill ? `calc(50% - ${(ECHO_W * scale) / 2}px)` : 0 }}
+      >
+        {children}
+      </div>
+    </div>
+  );
 }
 
 /** Renders the same timeline natively from structuredContent (fallback when the MCP App isn't available). */
@@ -69,7 +106,7 @@ export function McpAppView({
       { name: "Alexa+ simulator", version: "0.1.0" },
       { serverTools: {}, logging: {} },
       {
-        hostContext: { theme: "light", displayMode: "inline", platform: "web" },
+        hostContext: { theme: "dark", displayMode: "inline", platform: "web" },
       },
     );
     b.oninitialized = () => {

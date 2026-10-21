@@ -15,6 +15,7 @@ For every tool and SDK we used: what we used it for, what worked, what needs wor
   - The client validates `structuredContent` against `outputSchema` even on `isError` results, while the server skips it. Spec-style error payloads therefore make the client throw.
   - Generated output schemas are closed (`additionalProperties: false`) without that being documented next to `registerTool`.
   - Stateless servers produce a console 405 in browsers on every connect.
+  - Input-schema failures come back as raw validation text (`MCP error -32602: …`), and the method that builds them is private. Voice hosts need a public hook to turn that into speech; we override the instance method (see FRICTION_LOG.md).
   - The v1/v2 split (v2 targets 2026-07-28 with no `initialize`) is easy to install by accident.
 - **Onboarding:** Good once you know to pin v1. The protocol-version constant (`LATEST_PROTOCOL_VERSION = "2025-11-25"`) made the version test trivial.
 - **Would we use it again?** Yes.
@@ -99,10 +100,10 @@ For every tool and SDK we used: what we used it for, what worked, what needs wor
 - **Would we use them again?** Yes. Keep pricing and constraint logic outside UI/model code.
 
 ## Vitest and Playwright
-- **Used for:** 128 core/server tests, 21 standalone library tests, six browser scenarios, live screenshots and a reproducible product capture.
+- **Used for:** 166 core/server/library tests (including 22 for the standalone tariff library), eight browser scenarios, screenshots and a reproducible captioned product capture.
 - **What worked:** The browser suite exercises the real SDK/HTTP paths, including proposal approval, away/explain/undo, overnight execution, fallbacks, visitor isolation and exported evidence.
 - **Needs work:** Controlled occupancy checkboxes update after the server snapshot; tests must wait for the state rather than require an immediate synchronous change. External font requests can stall screenshot readiness.
-- **Onboarding:** Installed Chrome works with the existing test runner. The console font is now self-hosted with its OFL license, keeping text demos independent of Google Fonts availability.
+- **Onboarding:** Installed Chrome works with the existing test runner; `PW_CHROMIUM_PATH` lets the tests and the recorder use any other Chromium build. Video capture still needs Playwright's own FFmpeg (see FRICTION_LOG.md). The console font is now self-hosted with its OFL license, keeping text demos independent of Google Fonts availability.
 - **Would we use them again?** Yes. Unit tests verify invariants; browser tests verify the product flow.
 
 ## REA

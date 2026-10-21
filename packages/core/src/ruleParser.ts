@@ -70,6 +70,17 @@ export function parseRuleText(text: string, h: Household): RuleBody | null {
     if (start && end) return { type: "quiet_hours", start, end, appliesTo: "noisy" };
   }
 
+  // Run-by limits for one appliance: "never run the dryer after 9pm", "don't start the dishwasher after 11",
+  // "no laundry past 9:30 pm" → a finish deadline for that appliance.
+  const notAfter = new RegExp(`^(?:never|don't|do not|no) (?:ever )?(?:run|running|start|starting|use|using)? ?(?:the )?(.+?) (?:after|past|later than) ${TIME}`).exec(t);
+  // Not "don't start the dryer until after 10" (the opposite meaning), and not the car, whose rule is a
+  // charge-by deadline with a target and days that this phrasing would overwrite.
+  if (notAfter && !/\b(loud|noisy|noise|until|till|before)\b/.test(notAfter[1]!)) {
+    const id = deviceFrom(h, notAfter[1]!, (d) => isSchedulable(d) && !d.battery);
+    const at = parseClockWord(notAfter[2]!, "pm");
+    if (id && at) return { type: "deadline", deviceId: id, by: at as HHmm };
+  }
+
   // Never off: "never turn off the fish tank", "always keep the router on", "don't ever turn off the freezer"
   const never = /(?:never (?:turn|switch|shut) off|always keep|don't ever (?:turn|switch|shut) off|do not ever (?:turn|switch|shut) off|leave) (?:the )?(.+?)(?: on| alone)?$/.exec(t);
   if (never) {

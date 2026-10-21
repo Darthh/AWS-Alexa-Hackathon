@@ -1,6 +1,6 @@
 import {
   centsPerKwhSpoken,
-  dollars,
+  money,
   isSchedulable,
   ms,
   OffPeakError,
@@ -128,7 +128,7 @@ export const findCheapestWindow = defineTool({
     const demo = isDemoRate ? " on the demo rate" : "";
     const text = startsNow
       ? `Now is already the cheapest time to ${label}${finishBy ? ` before ${speakTime(finishBy, tz)}` : ""}${demo}.`
-      : `The cheapest time to ${label} is ${speakRange(start, end, tz)}, about ${dollars(p.savingsCents)} less than doing it now${demo}.`;
+      : `The cheapest time to ${label} is ${speakRange(start, end, tz)}, about ${money(p.savingsCents)} less than doing it now${demo}.`;
     return {
       text,
       data: {

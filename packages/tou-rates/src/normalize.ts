@@ -85,6 +85,22 @@ function fixedMonthlyCents(raw: OpenEIRate): number | undefined {
   return Math.round(amount * 100);
 }
 
+/** Tier-1 price (rate + adjustment) of each period, in cents/kWh. */
+function tierOneCents(raw: OpenEIRate): number[] {
+  return (raw.energyratestructure ?? []).map((tiers) => {
+    const t = tiers[0] ?? {};
+    return round3(((t.rate ?? 0) + (t.adj ?? 0)) * 100);
+  });
+}
+
+/**
+ * Time-of-use means the price actually changes within a day: some month's weekday schedule spans
+ * more than one distinct price. (Two period indices with the same price are still a flat rate.)
+ */
+function hasTimeVaryingPrice(weekday: number[][], cents: number[]): boolean {
+  return weekday.some((month) => new Set(month.map((i) => cents[i])).size > 1);
+}
+
 export function isExpired(raw: OpenEIRate, now: Date = new Date()): boolean {
   return typeof raw.enddate === "number" && raw.enddate * 1000 < now.getTime();
 }
@@ -95,10 +111,7 @@ export function normalize(raw: OpenEIRate, opts: NormalizeOptions = {}): Normali
   if (structure.length === 0) throw new Error(`Rate ${raw.label} has no energy rate structure`);
   const warnings: string[] = [];
 
-  const cents = structure.map((tiers) => {
-    const t = tiers[0] ?? {};
-    return round3(((t.rate ?? 0) + (t.adj ?? 0)) * 100);
-  });
+  const cents = tierOneCents(raw);
   if (structure.some((tiers) => tiers.length > 1)) warnings.push("Tiered pricing simplified to tier 1.");
 
   let weekday = raw.energyweekdayschedule;
@@ -113,7 +126,7 @@ export function normalize(raw: OpenEIRate, opts: NormalizeOptions = {}): Normali
   }
 
   const named = namePeriods(cents, weekday, weekend!);
-  const isTou = weekday.some((month) => new Set(month.map((i) => cents[i])).size > 1);
+  const isTou = hasTimeVaryingPrice(weekday, cents);
 
   return {
     rateId: raw.label,
@@ -135,7 +148,8 @@ const TOU_NAME = /\bTOU\b|time[- ]of[- ]use/i;
 /** TOU rates first, then names that say TOU / Time of Use, then newest. */
 export function rankRates(rates: OpenEIRate[]): OpenEIRate[] {
   const score = (r: OpenEIRate) => {
-    const tou = isSchedule(r.energyweekdayschedule, r.energyratestructure?.length ?? 0) && r.energyweekdayschedule!.some((m) => new Set(m).size > 1);
+    // Same TOU test as normalize(), so ranking and the isTou flag never disagree.
+    const tou = isSchedule(r.energyweekdayschedule, r.energyratestructure?.length ?? 0) && hasTimeVaryingPrice(r.energyweekdayschedule!, tierOneCents(r));
     return (tou ? 2 : 0) + (TOU_NAME.test(r.name) ? 1 : 0);
   };
   return [...rates].sort((a, b) => score(b) - score(a) || (b.startdate ?? 0) - (a.startdate ?? 0) || a.name.localeCompare(b.name));

@@ -1,3 +1,4 @@
+import "./env.ts"; // first: populate process.env before any config is read
 import { createApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { log, logError } from "./log.ts";

@@ -51,7 +51,7 @@ describe("M1 tools: tariffs, prices, status", () => {
     const r = await call(s, "select_rate_plan", { rateId: "69de71a5406310365e0f080d" });
     expect(r.data).toMatchObject({ utility: "Pacific Gas & Electric Co", isTou: true, isDemoRate: false });
     expect(r.data.warnings).toContain("Tiered pricing simplified to tier 1.");
-    expect(r.text).toBe("Switched to PG&E E-TOU-C Residential Time of Use Baseline Region X. Peak 4–9 PM today; cheapest midnight–4 PM and 9 PM–midnight.");
+    expect(r.text).toBe("Switched to PG&E E-TOU-C Residential Time of Use Baseline Region X. Peak 4 to 9 PM today; cheapest midnight to 4 PM and 9 PM to midnight.");
     const price = await call(s, "get_price_now");
     expect(price.data).toMatchObject({ centsPerKwh: 31.617, periodName: "peak", isDemoRate: false });
     const back = await call(s, "select_rate_plan", { rateId: "demo" });
@@ -61,7 +61,7 @@ describe("M1 tools: tariffs, prices, status", () => {
   it("find_cheapest_window for the dishwasher and a generic block", async () => {
     const r = await call(s, "find_cheapest_window", { device: "dishes" });
     expect(r.data).toMatchObject({ device: "Dishwasher", start: "2026-10-20T00:00:00-07:00", end: "2026-10-20T02:00:00-07:00", costCents: 29, costIfNowCents: 59 });
-    expect(r.text).toBe("The cheapest time to run the dishwasher is midnight–2 AM, about $0.30 less than doing it now on the demo rate.");
+    expect(r.text).toBe("The cheapest time to run the dishwasher is midnight to 2 AM, about 30 cents less than doing it now on the demo rate.");
     const g = await call(s, "find_cheapest_window", { durationMinutes: 120, finishBy: "21:00" });
     expect(g.data.start).toBe("2026-10-19T17:30:00-07:00");
     expect(g.text).toMatch(/^Now is already the cheapest time/);

@@ -40,9 +40,14 @@ export const explainTool = defineTool({
   async run(args, rt) {
     const h = await rt.household();
     const r = await explain(rt, h, args);
+    // Prices in a reason come from the tariff; name the synthetic demo rate whenever one is spoken.
+    if ((await rt.currentTariff(h)).source === "demo" && /¢\/kWh/.test(r.because) && !/demo rate/.test(r.because)) {
+      r.because = r.because.replace(/¢\/kWh/, "¢/kWh on the demo rate");
+    }
     const undoable = Boolean(r.entry && !r.entry.undone && r.entry.before && r.entry.source !== "undo");
+    const offer = !undoable ? "" : r.entry?.after?.on === false ? " Want me to turn it back on?" : " Want me to undo that?";
     return {
-      text: `${r.because}${undoable ? " Say undo to reverse it." : ""}`,
+      text: `${r.because}${offer}`,
       data: { because: r.because, entry: entryView(r.entry), step: r.step ? { start: r.step.start, end: r.step.end, reason: r.step.reason } : null, undoable },
     };
   },
@@ -52,13 +57,16 @@ export const undoTool = defineTool({
   name: "undo",
   title: "Undo",
   description:
-    "Reverse an Off-Peak action and restore the exact previous state: by default the most recent action (a whole mode change counts as one), or a specific one by id from explain or the ledger. " +
-    "Use for: 'undo that', 'turn it back on' (right after explain), 'put everything back'.",
-  input: { actionId: z.string().optional().describe("Ledger entry id or undo token; default: the latest action") },
+    "Reverse an Off-Peak action and restore the exact previous state: by default the most recent action (a whole mode change counts as one), one device's latest change, or a specific one by id from explain or the ledger. " +
+    "Use for: 'undo that', 'turn it back on' (right after explain: pass that device or the explained entry id), 'put everything back'.",
+  input: {
+    actionId: z.string().optional().describe("Ledger entry id or undo token; default: the latest action"),
+    device: z.string().optional().describe("Undo only Off-Peak's latest change to this device, e.g. 'TV'"),
+  },
   output: { restored: z.array(z.object({ deviceId: z.string(), name: z.string() })), undid: z.string() },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   async run(args, rt) {
-    const r = await rt.withLock(async () => undo(rt, await rt.household(), args.actionId));
+    const r = await rt.withLock(async () => undo(rt, await rt.household(), args.actionId, args.device));
     rt.changed("undo");
     let text: string;
     if (r.restored.length === 1 && !/mode|schedule/.test(r.undid)) text = `Done, ${the(r.restored[0]!.name)} is back the way it was.`;

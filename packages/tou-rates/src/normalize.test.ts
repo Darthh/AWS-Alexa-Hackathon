@@ -8,6 +8,7 @@ import {
   normalize,
   type OpenEIRate,
   priceAt,
+  rankRates,
   summarize,
 } from "./index.ts";
 
@@ -111,5 +112,24 @@ describe("per-month period naming", () => {
     expect(describeDay(t, "2026-07-15")).toBe("Peak 4–9 PM today; cheapest midnight–4 PM.");
     expect(priceAt(t, "2026-07-15T22:00:00-07:00")).toMatchObject({ centsPerKwh: 40, periodName: "off-peak" });
     expect(priceAt(t, "2026-01-14T17:00:00-08:00")).toMatchObject({ centsPerKwh: 40, periodName: "peak" });
+  });
+});
+
+describe("TOU detection is consistent", () => {
+  it("two periods at the same price are flat for both normalize() and rankRates()", () => {
+    const flat = [Array.from({ length: 24 }, (_, h) => (h < 12 ? 0 : 1))];
+    const months = Array.from({ length: 12 }, () => flat[0]!);
+    const samePrice: OpenEIRate = {
+      label: "same",
+      utility: "U",
+      name: "A two-period plan at one price",
+      energyratestructure: [[{ rate: 0.3 }], [{ rate: 0.3 }]],
+      energyweekdayschedule: months,
+      energyweekendschedule: months,
+    } as OpenEIRate;
+    const realTou: OpenEIRate = { ...samePrice, label: "tou", name: "Real", energyratestructure: [[{ rate: 0.2 }], [{ rate: 0.4 }]] } as OpenEIRate;
+    expect(normalize(samePrice).isTou).toBe(false);
+    expect(normalize(realTou).isTou).toBe(true);
+    expect(rankRates([samePrice, realTou]).map((r) => r.label)).toEqual(["tou", "same"]);
   });
 });

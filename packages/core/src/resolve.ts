@@ -1,5 +1,5 @@
 import { OffPeakError } from "./errors.ts";
-import { joinOr, the } from "./format.ts";
+import { capitalize, joinOr, the } from "./format.ts";
 import type { Device, DeviceKind, Household, Zone } from "./types.ts";
 
 export type Resolution<T> = { kind: "ok"; item: T } | { kind: "ambiguous"; candidates: T[] } | { kind: "none" };
@@ -36,19 +36,43 @@ function tokens(s: string): string[] {
   return normalizeRef(s).split(" ").filter(Boolean);
 }
 
-function levenshtein(a: string, b: string): number {
+/** Edit distance where swapping two adjacent letters counts as one edit ("wahser" → "washer"). */
+function editDistance(a: string, b: string): number {
   if (a === b) return 0;
-  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0]![j] = j;
   for (let i = 1; i <= a.length; i++) {
-    let diag = prev[0]!;
-    prev[0] = i;
     for (let j = 1; j <= b.length; j++) {
-      const tmp = prev[j]!;
-      prev[j] = Math.min(prev[j]! + 1, prev[j - 1]! + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
-      diag = tmp;
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let v = Math.min(d[i - 1]![j]! + 1, d[i]![j - 1]! + 1, d[i - 1]![j - 1]! + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, d[i - 2]![j - 2]! + 1);
+      d[i]![j] = v;
     }
   }
-  return prev[b.length]!;
+  return d[a.length]![b.length]!;
+}
+
+/** "tvs" → "tv", "lamps" → "lamp", "fans" → "fan" (not "glass" → "glas"). */
+function stem(w: string): string {
+  return w.length > 2 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w;
+}
+
+function kindWords(w: string): DeviceKind[] | undefined {
+  return KIND_WORDS[w] ?? KIND_WORDS[stem(w)];
+}
+
+/**
+ * Typo tolerance is for real misspellings ("dishwahser", "termostat", "frigde"), not for short words
+ * that happen to be one letter apart from another device ("tv" vs "ev", "light" vs "night"):
+ * references under 4 letters never fuzzy-match, and short device-kind words must match exactly.
+ */
+function typoMatch(a: string, b: string): boolean {
+  a = stem(a);
+  b = stem(b);
+  if (a === b) return true;
+  if (a.length < 4 || b.length < 4) return false;
+  if ((kindWords(a) || kindWords(b)) && Math.min(a.length, b.length) <= 5) return false;
+  return editDistance(a, b) <= (Math.min(a.length, b.length) >= 8 ? 2 : 1);
 }
 
 function nameScore(ref: string, names: string[]): number {
@@ -59,10 +83,10 @@ function nameScore(ref: string, names: string[]): number {
     const n = normalizeRef(raw);
     if (!n) continue;
     if (n === r) return 100;
-    if (levenshtein(n, r) <= (r.length > 5 ? 2 : 1)) best = Math.max(best, 85);
+    if (typoMatch(n, r)) best = Math.max(best, 85);
     const rt = new Set(tokens(r));
     const nt = tokens(n);
-    const hit = nt.filter((t) => rt.has(t) || [...rt].some((x) => x.length > 3 && levenshtein(x, t) <= 1)).length;
+    const hit = nt.filter((t) => rt.has(t) || [...rt].some((x) => stem(x) === stem(t) || (x.length >= 4 && typoMatch(x, t)))).length;
     if (hit) best = Math.max(best, Math.round((70 * hit) / Math.max(nt.length, rt.size)) + (hit === nt.length ? 10 : 0));
   }
   return best;
@@ -97,11 +121,11 @@ export function resolveDevice(h: Household, ref: string, filter?: (d: Device) =>
   const scored = devices.map((d) => {
     const names = [d.name, d.id.replace(/_/g, " "), ...d.aliases];
     let score = nameScore(ref, names);
-    const kindWords = tokens(zm ? zm.rest : ref).flatMap((t) => KIND_WORDS[t] ?? []);
-    if (kindWords.includes(d.kind)) score = Math.max(score, 60);
+    const kinds = tokens(zm ? zm.rest : ref).flatMap((t) => kindWords(t) ?? []);
+    if (kinds.includes(d.kind)) score = Math.max(score, 60);
     if (zm) {
       if (d.zoneId === zm.zone.id) {
-        const restScore = zm.rest ? Math.max(nameScore(zm.rest, names), kindWords.includes(d.kind) ? 80 : 0) : 0;
+        const restScore = zm.rest ? Math.max(nameScore(zm.rest, names), kinds.includes(d.kind) ? 80 : 0) : 0;
         score = Math.max(score, restScore ? Math.min(99, restScore + 15) : score);
       } else {
         score = Math.min(score, 50);
@@ -127,6 +151,18 @@ export function requireDevice(h: Household, ref: string, filter?: (d: Device) =>
     throw new OffPeakError("ambiguous", `Which one did you mean: ${joinOr(names)}?`, {
       candidates: r.candidates.map((d) => ({ id: d.id, name: d.name })),
     });
+  }
+  if (filter) {
+    // The device exists but isn't the right kind here ("schedule the TV"): say what *is* possible.
+    const any = resolveDevice(h, ref);
+    if (any.kind === "ok") {
+      const allowed = h.devices.filter(filter).map((d) => (d.kind === "ev_charger" ? "the car" : the(d.name)));
+      throw new OffPeakError(
+        "invalid_input",
+        `${capitalize(the(any.item.name))} isn't ${/^[aeiou]/i.test(what) ? "an" : "a"} ${what} I can schedule. I can plan ${joinOr(allowed)}.`,
+        { ref, deviceId: any.item.id },
+      );
+    }
   }
   throw new OffPeakError("not_found", `I couldn't find ${/^[aeiou]/i.test(what) ? "an" : "a"} ${what} called "${ref}".`, { ref });
 }

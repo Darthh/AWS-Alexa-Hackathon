@@ -73,15 +73,15 @@ Use **Large screen** for an Echo Show presentation view and Escape to exit. **Do
 
 The [hackathon readiness checklist](docs/hackathon-readiness.md) maps this work to the [official rules](https://amazonappdev2026.devpost.com/rules). The deadline is **Friday, October 23, 2026 at noon PDT**. [SUBMISSION.md](SUBMISSION.md) contains prepared entry text. A public video URL, team declarations and final Devpost submission remain.
 
-The additional MIT [tou-rates repository](https://github.com/Darthh/tou-rates) is public, with 21 standalone tests and an independent build. No npm registry release is claimed. The public Cloudflare demo does not establish live AWS-service use.
+The additional MIT [tou-rates repository](https://github.com/Darthh/tou-rates) is public, with standalone tests and an independent build. No npm registry release is claimed. The public Cloudflare demo does not establish live AWS-service use.
 
 ![OffPeak's AWS-inspired energy console: navigation, household metrics, Alexa+ appliance plan with $7.74 in synthetic savings, room occupancy, simulated clock, and activity ledger](docs/screenshots/01-plan.png)
 
-*Captured from the live Workers deployment in mock LLM mode. The light console uses AWS-style navigation, panels, and orange primary actions. The embedded timeline is the real MCP App, the browser connects to 17 MCP tools, and electricity rates and savings are explicitly synthetic.*
+*Captured from the Workers build (`npm run dev:worker`) in mock LLM mode on October 21, 2026. The light console uses AWS-style navigation, panels, and orange primary actions; the simulated device is a dark 16:10 Echo Show screen authored at its 960×600 size (every text size ≥ 24 px) and scaled to fit. The embedded timeline is the real MCP App, the header shows the negotiated protocol and transport, and electricity rates and savings are explicitly synthetic.*
 
 > “I need the car charged by 7, dishes and laundry done tonight, nothing loud after 10.”
 
-Off-Peak proposes the washer now, the dryer at 9 PM, and the dishwasher and car overnight. It asks before applying the plan, shows the schedule on an Echo Show-style screen, and explains the price and household constraints behind it.
+Off-Peak proposes the washer now, the dryer at 9 PM, and the dishwasher and car overnight. It asks before applying the plan, shows the schedule and its spoken reply on an Echo Show screen, and explains the price and household constraints behind it.
 
 <details>
 <summary><strong>More screens: away mode, savings, and voice-only</strong></summary>
@@ -103,7 +103,7 @@ Off-Peak proposes the washer now, the dryer at 9 PM, and the dishwasher and car 
 | **Explain and undo** | Records actions and reasons in a ledger and restores recorded previous state where supported. | [`services/trust.ts`](packages/server/src/services/trust.ts) |
 | **Savings breakdown** | Separates load shifting, idle savings, and room/away savings; flags modeled estimates. | [`core/savings.ts`](packages/core/src/savings.ts) |
 | **Real MCP traffic** | Browser performs initialization, tool discovery, tool calls, and resource reads over Streamable HTTP. | [`web/lib/mcp.ts`](packages/web/src/lib/mcp.ts) |
-| **Screen and voice** | Echo Show-style plan timeline, voice-only view, text input, push-to-talk, browser speech, and optional Polly. | [`web`](packages/web), [`ui-apps`](packages/ui-apps) |
+| **Screen and voice** | A 960×600 Echo Show screen (dark, ≥ 24 px type, on-screen captions) that scales from phone to Large screen, an Echo Dot voice-only view, text input, push-to-talk, browser speech, and optional Polly. Every tool reply is speakable: units in words, money under a dollar in cents, no IDs. | [`web`](packages/web), [`ui-apps`](packages/ui-apps) |
 | **Offline fallback** | Bundled tariffs, simulated devices, simulated time, mock LLM, and scripted intent routing keep the text demo local. | [`fixtures`](fixtures), [`core/intents.ts`](packages/core/src/intents.ts) |
 
 ## Quick start
@@ -120,8 +120,7 @@ Off-Peak proposes the washer now, the dryer at 9 PM, and the dishwasher and car 
 git clone https://github.com/Darthh/AWS-Alexa-Hackathon.git
 cd AWS-Alexa-Hackathon
 npm ci
-cp .env.example .env
-npm run dev
+npm run dev        # optional first: cp .env.example .env
 ```
 
 Open **<http://localhost:5173>**.
@@ -193,7 +192,7 @@ For the default weekday scenario, the integration test verifies:
 
 The washer runs **5:30–7 PM**, dryer **9–10 PM**, dishwasher **midnight–2 AM**, and car reaches 80% by **4:45 AM**. EV charging can contain multiple steps as load headroom changes.
 
-These are **fixture-based calculations, not measured utility-bill savings**. Also, “today” resets at midnight in the household timezone: the golden test expects **$7.20 today** at the following 7 AM for the overnight car and dishwasher, while the week total captures **$7.74** for the whole scenario. See [`scenario.golden.test.ts`](packages/server/test/scenario.golden.test.ts).
+These are **fixture-based calculations, not measured utility-bill savings**. A plan is one decision, so “today” counts the whole plan once any of its steps ran today: at 7 AM, “How much did Off-Peak save me today?” answers **$7.74**, matching the evening's proposal. Idle and away savings reset at local midnight. See [`scenario.golden.test.ts`](packages/server/test/scenario.golden.test.ts).
 
 ## Architecture
 
@@ -235,7 +234,7 @@ flowchart TB
 - `initialize`, `tools/list`, `tools/call`, and resource requests use the actual SDK and transport.
 - `GET /mcp` and `DELETE /mcp` return **405** by design. A browser address-bar GET is not an MCP health check.
 - MCP Apps integration uses **`@modelcontextprotocol/ext-apps@1.7.5`**, pinned for the SDK used here.
-- Tool inputs and outputs use Zod validation. Speakable domain errors use `isError`, text content, and `_meta["offpeak/error"]`.
+- Tool inputs and outputs use Zod validation. Speakable domain errors use `isError`, text content, and `_meta["offpeak/error"]`. Input-schema failures are spoken too (for example "I need a five-digit ZIP code to look up rate plans.") instead of the SDK's raw `-32602` text; malformed JSON gets a JSON-RPC `-32700` parse error.
 - Runtime mutations are serialized within a server process. This is not a distributed lock across multiple cloud instances.
 
 See [`mcp/server.ts`](packages/server/src/mcp/server.ts), [`app.ts`](packages/server/src/app.ts), [design decisions](DECISIONS.md), and [SDK friction notes](FRICTION_LOG.md).
@@ -630,9 +629,9 @@ The default output is `out/tou-rates`; the exporter constrains output to that de
 | `npm run typecheck:worker` | Check the Worker and Durable Object types |
 | `npm run dev:worker` | Run the complete Workers deployment locally on port 8790 |
 | `npm run deploy` | Build and deploy to the configured Cloudflare account and free subdomain |
-| `npm run test:e2e` | Run browser checks against the local Workers stack (installed Google Chrome required) |
+| `npm run test:e2e` | Run browser checks against the local Workers stack (installed Google Chrome, or any Chromium via `PW_CHROMIUM_PATH`) |
 | `npm run verify:submission` | Check required documents and a live MCP handshake, discovery and price call |
-| `npm run record:demo` | Capture the actual guided walkthrough as an English-captioned WebM |
+| `npm run record:demo` | Capture the actual guided walkthrough as an English-captioned WebM (`DEMO_URL` selects the deployment) |
 | `npm run build:lambda` | Bundle server/executor and copy runtime assets for CDK |
 | `npm run cdk:synth` | Install infra dependencies and synthesize CloudFormation; no deployment |
 | `npm run inspector` | Start the pinned MCP Inspector |
@@ -651,8 +650,9 @@ The default output is `out/tou-rates`; the exporter constrains output to that de
 - The web client's own conversation loop, run in Node through the LLM proxy (mock model) and the MCP server, turn by turn through the demo script.
 - Browser checks for all console controls, eight demo prompts, embedded/native screens, mock/scripted routing, typed messages, clock controls, occupancy, visitor isolation, refresh persistence, cross-origin rejection, and responsive navigation. Set `E2E_BASE_URL` to the deployed URL to run the same checks live; `UPDATE_SCREENSHOTS=1` refreshes the four README images from that run.
 - The complete default planning/execution scenario, including its exact fixture costs.
+- Pre-submission regressions (`refinements.test.ts` in core and server): no silent device swaps ("tv" vs "ev", "light" vs "night light"), spoken validation errors, priced conflict options with day words, pre-cooling that never starts in peak, ask-first questions in away mode, device-scoped undo, sleep-mode holds, rule phrasing people actually use, and the speech contract (no symbols, ≤ 2 sentences, no IDs).
 
-**Console verification on October 19, 2026:** all **128 tests across 12 test files**, workspace/Worker type checks, and the production Workers build passed. All **six browser scenarios** passed locally and against the deployed URL, including the guided walkthrough, downloadable evidence, explicit approval, stale-plan recovery, full evening, fallbacks, visitor isolation, and responsive navigation. The four images above come from that live browser run.
+**Verification on October 21, 2026:** all **166 tests across 14 test files**, workspace/Worker type checks, and the production Workers build passed. All **eight browser scenarios** passed against the local Workers build (`npm run dev:worker`), including the guided walkthrough, downloadable evidence, explicit approval, stale-plan recovery, full evening, fallbacks, visitor isolation, and responsive navigation. The four images above come from that run. The public URL keeps serving the October 19 build until `npm run deploy` is run again.
 
 Earlier infrastructure checks recorded for this repository include successful Lambda packaging, local CDK synthesis, and a standalone `tou-rates` export with **21 tests** and a successful build. Those checks are separate from this UI/Workers release and do not establish live AWS or device operation.
 

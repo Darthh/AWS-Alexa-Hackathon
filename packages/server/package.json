@@ -8,8 +8,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "dev": "node --env-file-if-exists=../../.env --watch src/main.ts",
-    "start": "node --env-file-if-exists=../../.env src/main.ts",
+    "dev": "node --watch src/main.ts",
+    "start": "node src/main.ts",
     "typecheck": "tsc -p tsconfig.json",
     "build:lambda": "npm run build -w @off-peak/ui-apps --prefix ../.. && vite build -c vite.lambda.config.ts && node scripts/package-lambda.mjs"
   },

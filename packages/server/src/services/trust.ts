@@ -1,9 +1,9 @@
 import {
   capitalize,
   computeSavings,
-  dollars,
   getDevice,
   joinAnd,
+  money,
   ms,
   OffPeakError,
   requireDevice,
@@ -82,11 +82,25 @@ export async function explain(
   return { because: explainEntry(last, h), entry: last, step: null };
 }
 
-/** Undo one action, or a whole group (a mode change, a plan). Default: the most recent undoable thing. */
-export async function undo(rt: Runtime, h: Household, actionId?: string): Promise<{ restored: { deviceId: string; name: string }[]; undid: string }> {
+/**
+ * Undo one action, or a whole group (a mode change, a plan). With `device`, undo only the latest change
+ * Off-Peak made to that device ("turn the TV back on" after "why did the TV turn off?").
+ * Default: the most recent undoable thing.
+ */
+export async function undo(
+  rt: Runtime,
+  h: Household,
+  actionId?: string,
+  device?: string,
+): Promise<{ restored: { deviceId: string; name: string }[]; undid: string }> {
   const ledger = await rt.store.listLedger();
   let targets: LedgerEntry[];
-  if (actionId) {
+  if (!actionId && device) {
+    const d = requireDevice(h, device);
+    const last = ledger.filter((e) => e.deviceId === d.id && e.before && UNDOABLE(e)).at(-1);
+    if (!last) throw new OffPeakError("not_found", `Off-Peak hasn't changed ${the(d.name)}, so there's nothing to undo.`);
+    targets = [last];
+  } else if (actionId) {
     const byId = ledger.find((e) => e.id === actionId);
     targets = byId ? [byId] : ledger.filter((e) => e.groupId === actionId);
     if (!targets.length) throw new OffPeakError("not_found", "I couldn't find that action to undo.");
@@ -142,6 +156,7 @@ export async function savings(rt: Runtime, h: Household, tariff: NormalizedTarif
 
 export function savingsSentence(s: ReturnType<typeof computeSavings>, period: SavingsPeriod, demoRate: boolean): string {
   const label = period === "today" ? "today" : period === "week" ? "this week" : "this month";
+  const counting = period === "today" && s.includesEarlierPlanSteps ? ", counting the whole overnight schedule" : "";
   const demo = demoRate ? " on the demo rate" : "";
   if (s.totalCents <= 0) return `No savings yet ${label}${demo}; schedule something and I'll start counting.`;
   const sources = [
@@ -150,6 +165,6 @@ export function savingsSentence(s: ReturnType<typeof computeSavings>, period: Sa
     s.bySource.away > 0 ? "powering down while rooms were empty" : "",
   ].filter(Boolean);
   const est = s.includeEstimates && s.estimatedCents > 0 ? ", including estimated heating and cooling savings" : "";
-  return `Off-Peak saved you about ${dollars(s.totalCents)} ${label}${demo}${est}. Most of it came from ${joinAnd(sources.slice(0, 2))}.`;
+  return `Off-Peak saved you about ${money(s.totalCents)} ${label}${demo}${est}${counting}. Most of it came from ${joinAnd(sources.slice(0, 2))}.`;
 }
 

@@ -152,8 +152,15 @@ export function renderTimeline(t: TimelineData): HTMLElement {
   const priceRow = el("div", "tl-row tl-prices");
   priceRow.append(el("div", "tl-label", "Price"));
   const track = el("div", "tl-track");
+  // One block per contiguous price period (not per 15-minute slot), so the strip has no seams.
+  const blocks: { start: number; end: number; periodName: string; centsPerKwh: number }[] = [];
   for (const p of t.prices) {
-    const b = place(el("div", `tl-price ${periodClass(p.periodName)}`), ms(p.start), ms(p.end), from, to);
+    const last = blocks.at(-1);
+    if (last && last.end === ms(p.start) && last.periodName === p.periodName && last.centsPerKwh === p.centsPerKwh) last.end = ms(p.end);
+    else blocks.push({ start: ms(p.start), end: ms(p.end), periodName: p.periodName, centsPerKwh: p.centsPerKwh });
+  }
+  for (const p of blocks) {
+    const b = place(el("div", `tl-price ${periodClass(p.periodName)}`), p.start, p.end, from, to);
     b.title = `${p.periodName}: ${p.centsPerKwh}¢/kWh`;
     track.append(b);
   }

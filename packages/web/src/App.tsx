@@ -6,6 +6,7 @@ import {
   LedgerPanel,
 } from "./components/Panels.tsx";
 import {
+  EchoShowFrame,
   McpAppView,
   NativeView,
   type ScreenPayload,
@@ -361,6 +362,29 @@ export function App() {
     { id: "inspector", label: "MCP Inspector", icon: "code" },
   ];
 
+  // One caption block: on the Echo Show screen (as Alexa shows replies), or under the Echo Dot.
+  const captionBlock = (
+    <div className="captions" aria-live="polite">
+      {!lastYou && !lastAlexa && (
+        <div className="conversation-welcome">
+          <Icon name="mic" />
+          <span>
+            <strong>What does your evening look like?</strong>
+            <br />
+            Ask Alexa to make a plan, or try a prompt below.
+          </span>
+        </div>
+      )}
+      {listening || interim ? (
+        <p className="cap you">{interim || "Listening…"}</p>
+      ) : (
+        lastYou && <p className="cap you">“{lastYou.text}”</p>
+      )}
+      {lastAlexa && <p className="cap alexa">{lastAlexa.text}</p>}
+      {busy && !listening && <p className="cap thinking">…</p>}
+    </div>
+  );
+
   return (
     <div className="app">
       <a className="skip-link" href="#overview">
@@ -461,7 +485,7 @@ export function App() {
           >
             <span className="status-dot" />
             {conn
-              ? `MCP connected · ${conn.tools.length} tools`
+              ? `MCP ${conn.protocolVersion ?? "…"} · Streamable HTTP · ${conn.tools.length} tools`
               : connError
                 ? "MCP offline"
                 : "Connecting…"}
@@ -595,57 +619,44 @@ export function App() {
               </div>
               <div className={`device ${voiceOnly ? "dot" : "show"}`}>
                 {voiceOnly ? (
-                  <div className="dot-wrap">
-                    <div
-                      className={`dot-ring ${listening ? "listening" : speaking || busy ? "speaking" : ""}`}
-                    />
-                  </div>
-                ) : (
-                  <div className="screen">
-                    <div className="screen-status">
-                      <span>{snap?.clock.label ?? ""}</span>
-                      <span>
-                        <span className="status-dot" /> OffPeak
-                      </span>
+                  <>
+                    <div className="dot-wrap">
+                      <div
+                        className={`dot-ring ${listening ? "listening" : speaking || busy ? "speaking" : ""}`}
+                      />
                     </div>
-                    <div className="screen-body">
-                      {conn && appHtml && !useNative ? (
-                        <McpAppView
-                          html={appHtml}
-                          conn={conn}
-                          payload={payload}
-                          onFail={() => setUseNative(true)}
+                    {captionBlock}
+                  </>
+                ) : (
+                  <EchoShowFrame fill={presenting}>
+                    <div className="screen">
+                      <div className="screen-status">
+                        <span>{snap?.clock.label ?? ""}</span>
+                        <span>
+                          <span className="status-dot" /> OffPeak
+                        </span>
+                      </div>
+                      <div className="screen-body">
+                        {conn && appHtml && !useNative ? (
+                          <McpAppView
+                            html={appHtml}
+                            conn={conn}
+                            payload={payload}
+                            onFail={() => setUseNative(true)}
+                          />
+                        ) : (
+                          <NativeView payload={payload} />
+                        )}
+                      </div>
+                      {captionBlock}
+                      {(listening || busy) && (
+                        <div
+                          className={`screen-bar ${listening ? "listening" : "thinking"}`}
                         />
-                      ) : (
-                        <NativeView payload={payload} />
                       )}
                     </div>
-                    {(listening || busy) && (
-                      <div
-                        className={`screen-bar ${listening ? "listening" : "thinking"}`}
-                      />
-                    )}
-                  </div>
+                  </EchoShowFrame>
                 )}
-                <div className="captions" aria-live="polite">
-                  {!lastYou && !lastAlexa && (
-                    <div className="conversation-welcome">
-                      <Icon name="mic" />
-                      <span>
-                        <strong>What does your evening look like?</strong>
-                        <br />
-                        Ask Alexa to make a plan, or try a prompt below.
-                      </span>
-                    </div>
-                  )}
-                  {listening || interim ? (
-                    <p className="cap you">{interim || "Listening…"}</p>
-                  ) : (
-                    lastYou && <p className="cap you">“{lastYou.text}”</p>
-                  )}
-                  {lastAlexa && <p className="cap alexa">{lastAlexa.text}</p>}
-                  {busy && !listening && <p className="cap thinking">…</p>}
-                </div>
               </div>
 
               <form

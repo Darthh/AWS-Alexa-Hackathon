@@ -5,7 +5,7 @@ test("guided demo proves the evening and exports observed evidence", async ({
   page,
 }) => {
   await page.goto("/");
-  await expect(page.getByText("MCP connected · 17 tools")).toBeVisible();
+  await expect(page.getByText("MCP 2025-11-25 · Streamable HTTP · 17 tools")).toBeVisible();
   await page.getByRole("button", { name: "Voice", exact: true }).click();
   const guide = page.getByRole("region", { name: "Guided judge walkthrough" });
   await guide.getByRole("button", { name: "Start guided demo" }).focus();
@@ -60,7 +60,7 @@ test("explicit plan approval and stale-plan recovery are visible", async ({
   page,
 }) => {
   await page.goto("/?mode=scripted&ui=native");
-  await expect(page.getByText("MCP connected · 17 tools")).toBeVisible();
+  await expect(page.getByText("MCP 2025-11-25 · Streamable HTTP · 17 tools")).toBeVisible();
   await page.getByRole("button", { name: "Voice", exact: true }).click();
   await page.locator(".chip").first().click();
   const review = page.getByRole("region", { name: "Plan cost and guardrails" });

@@ -108,7 +108,7 @@ describe("web client conversation loop (mock LLM) through the real proxy and MCP
 
     await jump(s, "2026-10-20T07:00:00-07:00");
     r = await convo.askLlm("How much did Off-Peak save me today?");
-    expect(r.reply).toMatch(/^Off-Peak saved you about \$7\.20 today/);
+    expect(r.reply).toMatch(/^Off-Peak saved you about \$7\.74 today on the demo rate, counting the whole overnight schedule\./);
     expect(tools.map((t) => t.name)).toEqual(["plan_tasks", "apply_plan", "set_mode", "explain", "undo", "get_savings"]);
   });
 

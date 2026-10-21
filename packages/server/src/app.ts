@@ -71,7 +71,16 @@ export function createApp(rt: Runtime, opts: { llm?: LlmDeps } = {}) {
   if (rt.config.simAdmin) app.use("/sim", simRouter(rt));
   app.use("/llm", llmRouter(rt, opts.llm));
 
-  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
+    // Malformed JSON on /mcp is a JSON-RPC parse error, not a server crash.
+    if ((err as { type?: string })?.type === "entity.parse.failed") {
+      if (!res.headersSent) {
+        res.status(400).json(
+          req.path.startsWith("/mcp") ? { jsonrpc: "2.0", error: { code: -32700, message: "Parse error" }, id: null } : { error: "invalid_json" },
+        );
+      }
+      return;
+    }
     logError("http", err);
     if (!res.headersSent) res.status(500).json({ error: "internal" });
   });

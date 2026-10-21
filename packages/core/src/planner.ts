@@ -1,4 +1,4 @@
-import { formatCentsValue, priceAt, type Instant } from "tou-rates";
+import { formatCentsValue, priceAt, toDateTime, type Instant } from "tou-rates";
 import { slots as priceSlots } from "tou-rates";
 import { OffPeakError } from "./errors.ts";
 import { capitalize, dollars, speakTime, the } from "./format.ts";
@@ -351,51 +351,106 @@ function chargeReason(t: Task, step: { start: number; end: number }, lastEnd: nu
 // ───────────────────────── conflicts ─────────────────────────
 
 function placementCost(t: Task, ctx: Ctx, o: PlaceOpts): number | null {
-  if (t.interruptible) return interruptiblePlacement(t, ctx, o).placement?.cost ?? null;
-  return bestOf(fixedCandidates(t, ctx, o))?.cost ?? null;
+  return placementInfo(t, ctx, o)?.cost ?? null;
 }
 
-function conflictFor(t: Task, ctx: Ctx, maxEnergy: number): Conflict {
-  const time = (x: number) => speakTime(x, ctx.tz);
+/** Cost and finish time of the best placement under relaxed options (for conflict options). */
+function placementInfo(t: Task, ctx: Ctx, o: PlaceOpts): { cost: number; end: number } | null {
+  if (t.interruptible) {
+    const p = interruptiblePlacement(t, ctx, o).placement;
+    return p && p.idx.length ? { cost: p.cost, end: ctx.slots[Math.max(...p.idx)]!.end } : null;
+  }
+  const b = bestOf(fixedCandidates(t, ctx, o));
+  return b ? { cost: b.cost, end: ctx.slots[b.i + t.nSlots - 1]!.end } : null;
+}
+
+/**
+ * The earliest feasible finish after the requested deadline, scanning 15-minute steps to the horizon.
+ * For a task with a fixed-length successor (washer → dryer) the finish is the pair's: the option has to
+ * make the whole chain fit, not just the first appliance.
+ */
+function earliestFeasibleFinish(t: Task, ctx: Ctx, succ?: Task): { cost: number; end: number; energy: number } | null {
+  const horizonEnd = ctx.slots.at(-1)!.end;
+  const tail = succ ? succ.nSlots * SLOT_MS : 0;
+  for (let f = alignUp(t.finishBy + 1); f <= horizonEnd; f += SLOT_MS) {
+    if (t.interruptible) {
+      const info = placementInfo(t, ctx, { finishBy: f });
+      if (info) return { ...info, energy: t.energy };
+      continue;
+    }
+    // Fixed-duration tasks: the earliest finish is the earliest candidate start, not the cheapest.
+    for (const c of fixedCandidates(t, ctx, { finishBy: f - tail })) {
+      const end = ctx.slots[c.i + t.nSlots - 1]!.end;
+      if (!succ) return { cost: c.cost, end, energy: t.energy };
+      const next = fixedCandidates(succ, ctx, { earliest: end, finishBy: f })[0];
+      if (next) return { cost: c.cost + next.cost, end: ctx.slots[next.i + succ.nSlots - 1]!.end, energy: t.energy + succ.energy };
+    }
+  }
+  return null;
+}
+
+/**
+ * Why a task doesn't fit, plus 2–3 concrete ways forward with their extra cost versus the cheapest
+ * possible run. Relaxing the rule that actually blocks it comes first (rules are the user's call),
+ * then later finish times, then a lower charge target.
+ */
+function conflictFor(t: Task, ctx: Ctx, maxEnergy: number, succ?: Task): Conflict {
+  const startDay = toDateTime(ctx.start, ctx.tz).toISODate();
+  /** "9 PM", or "7 AM tomorrow" when it falls on a later day than the request. */
+  const when = (x: number) => {
+    const d = toDateTime(x, ctx.tz);
+    const label = speakTime(x, ctx.tz);
+    if (d.toISODate() === startDay) return label;
+    const nextDay = toDateTime(ctx.start, ctx.tz).plus({ days: 1 }).toISODate();
+    return d.toISODate() === nextDay ? `${label} tomorrow` : `${label} on ${d.toFormat("cccc")}`;
+  };
   const minPrice = Math.min(...ctx.slots.map((s) => s.price));
-  const ideal = t.energy * minPrice;
   const options: ConflictOption[] = [];
-  const add = (label: string, cost: number | null, change: ConflictOption["change"]) => {
+  const add = (label: string, cost: number | null, change: ConflictOption["change"], energy = t.energy) => {
     if (cost === null || options.length >= 3) return;
-    const extra = Math.max(0, roundCents(cost - ideal));
+    if (options.some((o) => o.label.startsWith(label))) return;
+    const extra = Math.max(0, roundCents(cost - energy * minPrice));
     options.push({ label: extra > 0 ? `${label} (+${dollars(extra)})` : label, extraCostCents: extra, change });
   };
 
-  let why = `by ${time(t.finishBy)}`;
-  if (t.noisy && ctx.quietRule) {
-    const c = placementCost(t, ctx, { ignoreQuiet: true });
-    if (c !== null) {
-      const q = nextQuietStart(ctx, ctx.start);
-      why = q !== undefined ? `before quiet hours start at ${time(q)}` : "outside quiet hours";
-      add("Allow it during quiet hours", c, { relaxRuleId: ctx.quietRule.id });
-    }
-  }
-  if (ctx.maxLoad !== undefined && ctx.maxLoadRuleId) {
-    const c = placementCost(t, ctx, { ignoreLoad: true });
-    if (c !== null) {
-      if (options.length === 0) why = `without going over the ${ctx.maxLoad} kW limit`;
-      add(`Go over the ${ctx.maxLoad} kW limit briefly`, c, { relaxRuleId: ctx.maxLoadRuleId });
-    }
+  const quietCost = t.noisy && ctx.quietRule ? placementCost(t, ctx, { ignoreQuiet: true }) : null;
+  const loadCost = ctx.maxLoad !== undefined && ctx.maxLoadRuleId ? placementCost(t, ctx, { ignoreLoad: true }) : null;
+  let why = `by ${when(t.finishBy)}`;
+  if (quietCost !== null) {
+    const q = nextQuietStart(ctx, ctx.start);
+    why = q !== undefined ? `before quiet hours start at ${when(q)}` : "outside quiet hours";
+    add("Allow it during quiet hours", quietCost, { relaxRuleId: ctx.quietRule!.id });
+  } else if (loadCost !== null) {
+    why = `without going over the ${ctx.maxLoad} kW limit`;
+    add(`Go over the ${ctx.maxLoad} kW limit briefly`, loadCost, { relaxRuleId: ctx.maxLoadRuleId! });
   }
   if (t.device.battery && t.targetPercent !== undefined && maxEnergy > 0) {
     const reachable = Math.floor((t.device.battery.socPercent + (maxEnergy / t.device.battery.capacityKwh) * 100) / 5) * 5;
     if (reachable > t.device.battery.socPercent) {
       const c = placementCost(t, ctx, { energy: ((reachable - t.device.battery.socPercent) / 100) * t.device.battery.capacityKwh });
-      add(`Charge to ${reachable}% instead`, c, { targetPercent: reachable });
+      add(`Charge to ${reachable}% instead of ${t.targetPercent}%`, c, { targetPercent: reachable });
     }
   }
-  const later = t.finishBy + 12 * HOUR;
-  if (later <= ctx.slots.at(-1)!.end) {
-    add(`Finish by ${time(later)} instead`, placementCost(t, ctx, { finishBy: later }), { finishBy: iso(later, ctx.tz) });
+  // Later deadlines: the earliest finish that works, and the cheapest one if it's different.
+  const chain = succ && !succ.interruptible && !t.interruptible ? succ : undefined;
+  const earliest = earliestFeasibleFinish(t, ctx, chain);
+  if (earliest && earliest.end > t.finishBy) {
+    add(`Finish by ${when(earliest.end)} instead`, earliest.cost, { finishBy: iso(earliest.end, ctx.tz) }, earliest.energy);
+  }
+  if (!chain) {
+    const cheapest = placementInfo(t, ctx, { finishBy: ctx.slots.at(-1)!.end });
+    if (cheapest && earliest && cheapest.end > t.finishBy && cheapest.end !== earliest.end && cheapest.cost < earliest.cost - 0.5) {
+      add(`Finish by ${when(cheapest.end)} instead`, cheapest.cost, { finishBy: iso(cheapest.end, ctx.tz) });
+    }
+  }
+  if (loadCost !== null && quietCost !== null) {
+    add(`Go over the ${ctx.maxLoad} kW limit briefly`, loadCost, { relaxRuleId: ctx.maxLoadRuleId! });
   }
   return {
     deviceId: t.device.id,
-    message: `I can't fit ${the(t.device.name)} ${why}.`,
+    message: t.device.battery && t.targetPercent !== undefined && why.startsWith("by ")
+      ? `I can't charge the car to ${t.targetPercent}% ${why}.`
+      : `I can't fit ${t.device.battery ? "charging the car" : the(t.device.name)} ${why}.`,
     options,
   };
 }
@@ -457,7 +512,12 @@ export function plan(
     if (placements.has(t.device.id) || failed.has(t.device.id)) continue;
     if (t.after && failed.has(t.after)) {
       failed.add(t.device.id);
-      conflicts.push({ deviceId: t.device.id, message: `${capitalize(the(t.device.name))} has to wait for ${the(byId.get(t.after)!.device.name)}.`, options: [] });
+      const upstream = conflicts.find((c) => c.deviceId === t.after);
+      conflicts.push({
+        deviceId: t.device.id,
+        message: `${capitalize(the(t.device.name))} has to wait for ${the(byId.get(t.after)!.device.name)}.`,
+        options: (upstream?.options ?? []).filter((o) => "relaxRuleId" in o.change),
+      });
       continue;
     }
     const succ = t.successors.length === 1 ? byId.get(t.successors[0]!) : undefined;
@@ -478,7 +538,7 @@ export function plan(
         placements.set(t.device.id, placement);
       } else {
         failed.add(t.device.id);
-        conflicts.push(conflictFor(t, ctx, maxEnergy));
+        conflicts.push(conflictFor(t, ctx, maxEnergy, succ));
       }
       continue;
     }
@@ -489,7 +549,7 @@ export function plan(
       placements.set(t.device.id, p);
     } else {
       failed.add(t.device.id);
-      conflicts.push(conflictFor(t, ctx, 0));
+      conflicts.push(conflictFor(t, ctx, 0, succ));
     }
   }
 

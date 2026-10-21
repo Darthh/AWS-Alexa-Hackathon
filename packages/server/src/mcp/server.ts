@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Runtime } from "../runtime.ts";
-import { registerTool, type ToolDef } from "./defineTool.ts";
+import { installSpeakableErrors, registerTool, type ToolDef } from "./defineTool.ts";
 import { registerResources } from "./resources.ts";
 import { controlDeviceTool, getHomeStatus } from "./tools/home.ts";
 import { applyPlanTool, cancelPlanTool, planTasks } from "./tools/plans.ts";
@@ -42,6 +42,7 @@ export const TOOLS = [
 export function buildServer(rt: Runtime): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: INSTRUCTIONS });
   for (const def of TOOLS) registerTool(server, rt, def);
+  installSpeakableErrors(server);
   registerResources(server, rt);
   return server;
 }

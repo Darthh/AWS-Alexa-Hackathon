@@ -118,7 +118,7 @@ export async function scheduleArrival(
       deviceId: thermostat.id,
       groupId,
       createdAt: created,
-      payload: { setpointF: setback?.before?.setpointF ?? thermostat.state.setpointF ?? 74, reason: plan.note.replace(/^Cooling starts/, "pre-cooling for your return; it starts").replace(/\.$/, "") },
+      payload: { setpointF: setback?.before?.setpointF ?? thermostat.state.setpointF ?? 74, reason: plan.reason },
     });
   }
   jobs.push({ id: rt.newId("job"), at: iso(plan.restoreAt, tz), kind: "restore", status: "pending", groupId, createdAt: created });
@@ -223,7 +223,7 @@ export async function runPresenceJob(rt: Runtime, h: Household, job: Job): Promi
         at,
         source: "arrival",
         action: "pre-cool",
-        reason: String(job.payload?.reason ?? "pre-cooling for your return"),
+        reason: String(job.payload?.reason ?? "you were due home"),
         groupId: job.groupId,
       });
     }
@@ -245,12 +245,19 @@ export async function arriving(
   h: Household,
   tariff: NormalizedTariff,
   eta: string | number,
-): Promise<{ restoreAt: string; preconditionAt: string; notes: string }> {
+): Promise<{ restoreAt: string; preconditionAt: string; notes: string; willRestore: boolean }> {
   const now = rt.clock.now();
   const t = parseWhen(eta, now, h.timezone);
   if (t === null) throw new OffPeakError("invalid_input", `I didn't understand the arrival time "${eta}".`);
   const r = await scheduleArrival(rt, h, tariff, t, rt.newId("grp"));
   h.returnAt = r.restoreAt;
   await rt.store.saveHousehold(h);
-  return { restoreAt: r.restoreAt, preconditionAt: r.preconditionAt, notes: `${r.note} Everything else comes back on at ${speakTime(r.restoreAt, h.timezone)}.` };
+  // The restore job only acts when the house is in away/zone/sleep mode; don't promise it otherwise.
+  const willRestore = h.mode !== "home";
+  return {
+    restoreAt: r.restoreAt,
+    preconditionAt: r.preconditionAt,
+    notes: willRestore ? `${r.note} Everything else comes back on at ${speakTime(r.restoreAt, h.timezone)}.` : r.note,
+    willRestore,
+  };
 }

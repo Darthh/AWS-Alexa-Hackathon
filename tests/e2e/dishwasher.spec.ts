@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 for (const mode of ["mock", "scripted"] as const) {
   test(`cheapest dishwasher request proposes, approves and runs in ${mode} mode`, async ({ page }) => {
     await page.goto(mode === "scripted" ? "/?mode=scripted&ui=native" : "/");
-    await expect(page.getByText("MCP connected · 17 tools")).toBeVisible();
+    await expect(page.getByText("MCP 2025-11-25 · Streamable HTTP · 17 tools")).toBeVisible();
     await page.getByRole("button", { name: "Voice", exact: true }).click();
     const ask = async (text: string) => {
       await page.getByLabel("Message to Alexa").fill(text);

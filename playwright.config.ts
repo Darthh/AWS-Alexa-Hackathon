@@ -7,7 +7,10 @@ export default defineConfig({
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:8790",
     viewport: { width: 1440, height: 1100 },
-    channel: "chrome",
+    // Installed Chrome by default; PW_CHROMIUM_PATH points at any other Chromium build (CI, sandboxes).
+    ...(process.env.PW_CHROMIUM_PATH
+      ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH, args: ["--no-sandbox", "--disable-gpu"] } }
+      : { channel: "chrome" }),
     trace: "retain-on-failure",
   },
   workers: 1,

@@ -78,9 +78,12 @@ describe("golden scenario over MCP", () => {
     expect(ledger.find((e) => e.deviceId === "ev" && e.action === "charge")!.at).toBe("2026-10-20T00:00:00-07:00");
 
     const savings = await call(s, "get_savings", { period: "today" });
-    // Today (since midnight): the car and dishwasher shifts: 690 + 30 cents.
-    expect(savings.data.bySource.shift).toBe(720);
-    expect(savings.text).toBe("Off-Peak saved you about $7.20 today on the demo rate. Most of it came from running things off-peak.");
+    // Today counts the whole plan that finished this morning (last night's washer and dryer too), so the
+    // morning answer matches the $7.74 the plan promised; the week total is the same plan.
+    expect(savings.data.bySource.shift).toBe(774);
+    expect(savings.text).toBe(
+      "Off-Peak saved you about $7.74 today on the demo rate, counting the whole overnight schedule. Most of it came from running things off-peak.",
+    );
     const week = await call(s, "get_savings", { period: "week" });
     expect(week.data.bySource.shift).toBe(774);
   });
@@ -100,7 +103,7 @@ describe("plan lifecycle", () => {
     const r = await call(s, "plan_tasks", { tasks: [{ device: "washer", finishBy: "tonight" }] });
     expect(r.data.steps).toHaveLength(0);
     expect(r.data.conflicts[0].message).toBe("I can't fit the washer before quiet hours start at 10 PM.");
-    expect(r.text).toBe("I can't fit the washer before quiet hours start at 10 PM. Should I allow it during quiet hours or finish by 7 PM instead?");
+    expect(r.text).toBe("I can't fit the washer before quiet hours start at 10 PM. Should I allow it during quiet hours or finish by 8:30 AM tomorrow instead?");
     const relaxed = await call(s, "plan_tasks", { tasks: [{ device: "washer", finishBy: "tonight" }], relaxRules: ["rule_quiet"] });
     expect(relaxed.data.steps[0].start).toBe("2026-10-20T00:00:00-07:00");
   });

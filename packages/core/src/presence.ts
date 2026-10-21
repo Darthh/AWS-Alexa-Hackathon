@@ -120,12 +120,12 @@ export function planModeChange(
     let action: DeviceAction | null = null;
     if (SWITCHABLE.has(d.kind) && d.state.on) {
       action = { deviceId: d.id, name: d.name, change: { on: false }, action: "off", reason: `${why(d)} and ${drawing(d)}` };
-    } else if (d.kind === "thermostat" && mode === "away") {
+    } else if (d.kind === "thermostat" && mode !== "sleep") {
       const target = awaySetpoint(h);
       if (d.state.setpointF !== target) {
         action = { deviceId: d.id, name: d.name, change: { setpointF: target }, action: "setback", reason: `${why(d)}, so cooling is set back to ${target}°F` };
       }
-    } else if (d.kind === "water_heater" && mode === "away" && !d.state.ecoMode) {
+    } else if (d.kind === "water_heater" && mode !== "sleep" && !d.state.ecoMode) {
       action = { deviceId: d.id, name: d.name, change: { ecoMode: true }, action: "eco", reason: `${why(d)}, so the water heater is in eco mode` };
     }
     if (!action) continue;
@@ -167,23 +167,51 @@ export function planRestore(h: Household, ledger: LedgerEntry[]): Restore[] {
 export interface ArrivalPlan {
   restoreAt: number;
   preconditionAt: number;
+  /** Speakable: "Cooling starts at 9 PM, when peak ends." */
   note: string;
+  /** A "because" clause for the ledger: "you were due home at 9 PM and peak pricing ended then". */
+  reason: string;
 }
 
-/** Pre-cool 30 minutes before arrival, but never inside a peak period. */
+/**
+ * Pre-cool 30 minutes before arrival, but never inside a peak period: if any of that window is peak,
+ * start when peak ends, or at arrival if peak lasts past it.
+ */
 export function planArrival(h: Household, tariff: NormalizedTariff, now: number, eta: number): ArrivalPlan {
   const tz = h.timezone;
   const desired = Math.max(now, eta - PRECONDITION_MIN * MINUTE);
   const isPeak = (t: number) => priceAt(tariff, t).periodName === "peak";
-  let peakDuring = false;
-  for (let t = desired; t < eta; t += SLOT_MS) if (isPeak(t)) peakDuring = true;
-  if (!peakDuring) {
-    return { restoreAt: eta, preconditionAt: desired, note: `Cooling starts at ${speakTime(desired, tz)}, ${PRECONDITION_MIN} minutes before you're home.` };
+  const home = speakTime(eta, tz);
+  let firstPeak: number | undefined;
+  for (let t = desired; t < eta; t = Math.floor(t / SLOT_MS) * SLOT_MS + SLOT_MS) {
+    if (isPeak(t)) {
+      firstPeak = t;
+      break;
+    }
   }
-  let peakEnd = desired;
+  if (firstPeak === undefined) {
+    return {
+      restoreAt: eta,
+      preconditionAt: desired,
+      note: `Cooling starts at ${speakTime(desired, tz)}, ${PRECONDITION_MIN} minutes before you're home.`,
+      reason: `you were due home at ${home}`,
+    };
+  }
+  let peakEnd = firstPeak;
   while (isPeak(peakEnd) && peakEnd < eta + 24 * 60 * MINUTE) peakEnd = Math.floor(peakEnd / SLOT_MS) * SLOT_MS + SLOT_MS;
   if (peakEnd <= eta) {
-    return { restoreAt: eta, preconditionAt: peakEnd, note: `Cooling starts at ${speakTime(peakEnd, tz)}, when peak ends.` };
+    const start = Math.max(peakEnd, desired);
+    return {
+      restoreAt: eta,
+      preconditionAt: start,
+      note: `Cooling starts at ${speakTime(start, tz)}, when peak ends.`,
+      reason: `you were due home at ${home} and peak pricing ended at ${speakTime(start, tz)}`,
+    };
   }
-  return { restoreAt: eta, preconditionAt: eta, note: `Cooling starts when you get home at ${speakTime(eta, tz)}, since it's peak until ${speakTime(peakEnd, tz)}.` };
+  return {
+    restoreAt: eta,
+    preconditionAt: eta,
+    note: `Cooling starts when you get home at ${home}, since it's peak until ${speakTime(peakEnd, tz)}.`,
+    reason: `you were due home at ${home}; it waited until then because it's peak until ${speakTime(peakEnd, tz)}`,
+  };
 }
