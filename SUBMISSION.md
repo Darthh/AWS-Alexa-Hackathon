@@ -75,7 +75,7 @@ This repository was created on October 17, 2026, within the official August 31â€
 
 ## Open Source mini challenge fields
 
-- **Contribution URL:** <https://github.com/Darthh/tou-rates/commit/d2fb907>
+- **Contribution URL:** <https://github.com/Darthh/tou-rates/commit/d2fb907> (initial library); follow-up fix during the window: <https://github.com/Darthh/tou-rates/commit/08825c0> (TOU ranking and `isTou` now use one test, with a regression test)
 - **Project repository:** <https://github.com/Darthh/tou-rates>
 - **GitHub username:** `Darthh` (confirm additional teammates separately).
 - **What:** A new MIT TypeScript project for residential OpenEI time-of-use tariffs.

@@ -26,7 +26,7 @@ The official deadline is **Friday, October 23, 2026 at 12:00 PM PDT**. The suppl
 
 ## Open Source fields
 
-- Contribution URL: <https://github.com/Darthh/tou-rates/commit/d2fb907>
+- Contribution URL: <https://github.com/Darthh/tou-rates/commit/d2fb907>; follow-up commit <https://github.com/Darthh/tou-rates/commit/08825c0> (October 21)
 - Project repository URL: <https://github.com/Darthh/tou-rates>
 - GitHub username with a verified contribution: `Darthh`.
 - What: an additional MIT TypeScript library that turns OpenEI residential tariffs into schedulable time-of-use prices.
